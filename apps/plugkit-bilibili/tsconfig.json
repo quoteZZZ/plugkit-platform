@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["chrome", "wxt"],
+    "jsx": "react-jsx",
+    "noEmit": true
+  },
+  "include": ["src", "../../packages/plugkit-core/src"]
+}

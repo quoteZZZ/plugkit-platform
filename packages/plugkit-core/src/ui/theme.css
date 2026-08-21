@@ -1,0 +1,211 @@
+/* PlugKit UI 设计系统（现代浅色）——所有插件共享，修改后全部插件外观同步更新 */
+:root {
+  --pk-bg: #f6f8fa;
+  --pk-surface: #ffffff;
+  --pk-border: #d0d7de;
+  --pk-border-soft: #eaeef2;
+  --pk-text: #1f2328;
+  --pk-text-secondary: #57606a;
+  --pk-text-muted: #8c959f;
+  --pk-accent: #1f6feb;
+  --pk-accent-weak: #ddf4ff;
+  --pk-success: #1a7f37;
+  --pk-success-weak: #dafbe1;
+  --pk-danger: #cf222e;
+  --pk-danger-weak: #ffebe9;
+  --pk-radius: 10px;
+  --pk-radius-sm: 8px;
+  --pk-shadow: 0 1px 3px rgba(31, 35, 40, 0.08);
+  --pk-font: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* ============ 通用 ============ */
+.plugkit-card {
+  background: var(--pk-surface);
+  border: 1px solid var(--pk-border);
+  border-radius: var(--pk-radius);
+  box-shadow: var(--pk-shadow);
+  padding: 12px 14px;
+}
+
+.plugkit-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 18px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pk-text-secondary);
+  letter-spacing: 0.05em;
+}
+
+/* 按钮 */
+.plugkit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--pk-border);
+  border-radius: var(--pk-radius-sm);
+  background: var(--pk-surface);
+  color: var(--pk-text);
+  font-size: 13px;
+  font-family: var(--pk-font);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.plugkit-btn:hover { background: var(--pk-border-soft); }
+.plugkit-btn-primary {
+  background: var(--pk-accent);
+  border-color: var(--pk-accent);
+  color: #fff;
+}
+.plugkit-btn-primary:hover { background: #1667d9; }
+.plugkit-btn-danger { color: var(--pk-danger); border-color: #f0c2c5; }
+.plugkit-btn-danger:hover { background: var(--pk-danger-weak); }
+
+/* 输入框 */
+.plugkit-input {
+  padding: 6px 10px;
+  border: 1px solid var(--pk-border);
+  border-radius: var(--pk-radius-sm);
+  font-size: 13px;
+  font-family: var(--pk-font);
+  color: var(--pk-text);
+  background: var(--pk-surface);
+}
+.plugkit-input:focus { outline: 2px solid var(--pk-accent-weak); border-color: var(--pk-accent); }
+
+.plugkit-search {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--pk-border);
+  border-radius: var(--pk-radius-sm);
+  font-size: 13px;
+  font-family: var(--pk-font);
+  box-sizing: border-box;
+}
+.plugkit-search:focus { outline: 2px solid var(--pk-accent-weak); border-color: var(--pk-accent); }
+
+/* 徽章 */
+.plugkit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.plugkit-badge.success { background: var(--pk-success-weak); color: var(--pk-success); }
+.plugkit-badge.muted { background: var(--pk-border-soft); color: var(--pk-text-secondary); }
+.plugkit-badge.accent { background: var(--pk-accent-weak); color: var(--pk-accent); }
+.plugkit-badge.danger { background: var(--pk-danger-weak); color: var(--pk-danger); }
+
+/* ============ Popup ============ */
+.plugkit-popup {
+  width: 340px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding: 16px;
+  box-sizing: border-box;
+  font-family: var(--pk-font);
+  color: var(--pk-text);
+  background: var(--pk-bg);
+}
+.plugkit-popup h3 { margin: 0; font-size: 15px; }
+.plugkit-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* 统计卡 */
+.pk-stat { margin-bottom: 8px; }
+.pk-stat-label { font-size: 12px; color: var(--pk-text-secondary); }
+.pk-stat-value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+.pk-stat-sub { font-size: 11px; color: var(--pk-text-muted); margin-top: 2px; }
+
+/* 开关行 */
+.plugkit-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--pk-text);
+  border-bottom: 1px solid var(--pk-border-soft);
+}
+.plugkit-toggle:last-child { border-bottom: none; }
+.plugkit-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.plugkit-toggle .track {
+  position: relative;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+  background: #d0d7de;
+  transition: background 0.15s;
+}
+.plugkit-toggle .track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s;
+}
+.plugkit-toggle input:checked + .track { background: var(--pk-accent); }
+.plugkit-toggle input:checked + .track::after { transform: translateX(14px); }
+
+/* 键值行 */
+.plugkit-field {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.plugkit-field > .label { flex: 0 0 92px; color: var(--pk-text-secondary); }
+.plugkit-field > .value { flex: 1; word-break: break-all; }
+
+/* ============ Options ============ */
+.plugkit-options {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  font-family: var(--pk-font);
+  color: var(--pk-text);
+}
+.plugkit-options h2 { margin: 0 0 4px; font-size: 20px; }
+.plugkit-options .subtitle { color: var(--pk-text-secondary); font-size: 13px; margin: 0 0 8px; }
+
+/* ============ 日志视图 ============ */
+.plugkit-log-list {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: var(--pk-radius-sm);
+  padding: 8px 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.plugkit-log-row {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+  word-break: break-all;
+}
+.plugkit-log-time { color: #8c959f; flex-shrink: 0; }
+.plugkit-log-level { flex-shrink: 0; width: 42px; font-weight: 700; text-transform: uppercase; }
+.plugkit-log-msg { color: #e6edf3; }

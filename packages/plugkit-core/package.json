@@ -1,0 +1,32 @@
+{
+  "name": "@plugkit/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./ui": "./src/ui/index.ts",
+    "./messaging": "./src/messaging/index.ts",
+    "./storage": "./src/storage/index.ts",
+    "./platform": "./src/platform/index.ts",
+    "./logger": "./src/logger/index.ts"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "wxt": ">=0.20"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.6.0",
+    "wxt": "^0.21.4"
+  }
+}
