@@ -13,15 +13,18 @@ export function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <label className={`plugkit-toggle${disabled ? ' disabled' : ''}`}>
+    <div className={`plugkit-toggle${disabled ? ' disabled' : ''}`}>
       <span>{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span className="track" />
-    </label>
+      {/* 仅滑块区域可点击切换；点击文字不触发 */}
+      <label className="control">
+        <input
+          type="checkbox"
+          checked={checked}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span className="track" />
+      </label>
+    </div>
   );
 }

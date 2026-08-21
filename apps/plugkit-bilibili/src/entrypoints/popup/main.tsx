@@ -234,7 +234,7 @@ function App() {
         />
         <p className="pk-stat-sub" style={{ margin: '2px 0 8px' }}>
           {settings.masterOn
-            ? `已启用 · 档位：${settings.aggressive ? '激进' : '标准'}（详设中可切换）`
+            ? `已启用 · 档位：${settings.aggressive ? '激进' : '标准'}`
             : '已停用，视频走原始 CDN（网页净化等其余功能不受影响）'}
         </p>
       </div>
@@ -244,7 +244,7 @@ function App() {
         <StatCard
           label="PCDN 拦截"
           value={String(stats.todayPcdn)}
-          sub={`累计 ${stats.totalPcdn} 次`}
+          sub={`累计 ${stats.totalPcdn} 次 · 估算省 ${todayEstimatedMB} MB`}
         />
         <StatCard
           label="阻止上传"
@@ -255,7 +255,7 @@ function App() {
       <StatCard
         label="清理广告"
         value={String(stats.todayAdRemoved)}
-        sub={`累计 ${stats.totalAdRemoved} 个 · 估算省 ${todayEstimatedMB} MB`}
+        sub={`累计 ${stats.totalAdRemoved} 个`}
       />
 
       {stats.daily.length > 0 && <TrendChart daily={stats.daily} />}
