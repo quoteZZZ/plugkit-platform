@@ -1,4 +1,4 @@
-/* PlugKit UI 设计系统（现代浅色）——所有插件共享，修改后全部插件外观同步更新 */
+/* PlugKit UI 设计系统（现代浅色 + 自动深色）——所有插件共享，修改后全部插件外观同步更新 */
 :root {
   --pk-bg: #f6f8fa;
   --pk-surface: #ffffff;
@@ -17,6 +17,28 @@
   --pk-radius-sm: 8px;
   --pk-shadow: 0 1px 3px rgba(31, 35, 40, 0.08);
   --pk-font: system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color-scheme: light;
+}
+
+/* 跟随系统深色模式 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pk-bg: #0d1117;
+    --pk-surface: #161b22;
+    --pk-border: #30363d;
+    --pk-border-soft: #21262d;
+    --pk-text: #e6edf3;
+    --pk-text-secondary: #8b949e;
+    --pk-text-muted: #6e7681;
+    --pk-accent: #58a6ff;
+    --pk-accent-weak: #1f2d3d;
+    --pk-success: #3fb950;
+    --pk-success-weak: #12261d;
+    --pk-danger: #f85149;
+    --pk-danger-weak: #3a1213;
+    --pk-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
 }
 
 /* ============ 通用 ============ */
@@ -55,14 +77,16 @@
   transition: background 0.12s;
 }
 .plugkit-btn:hover { background: var(--pk-border-soft); }
+.plugkit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .plugkit-btn-primary {
   background: var(--pk-accent);
   border-color: var(--pk-accent);
   color: #fff;
 }
-.plugkit-btn-primary:hover { background: #1667d9; }
-.plugkit-btn-danger { color: var(--pk-danger); border-color: #f0c2c5; }
-.plugkit-btn-danger:hover { background: var(--pk-danger-weak); }
+.plugkit-btn-primary:hover { background: var(--pk-accent); filter: brightness(1.1); }
+.plugkit-btn-primary:disabled { background: var(--pk-accent); filter: grayscale(0.4); opacity: 0.6; }
+.plugkit-btn-danger { color: var(--pk-danger); border-color: var(--pk-danger); opacity: 0.85; }
+.plugkit-btn-danger:hover { background: var(--pk-danger-weak); opacity: 1; }
 
 /* 输入框 */
 .plugkit-input {
@@ -141,6 +165,7 @@
   border-bottom: 1px solid var(--pk-border-soft);
 }
 .plugkit-toggle:last-child { border-bottom: none; }
+.plugkit-toggle.disabled { cursor: not-allowed; opacity: 0.55; }
 .plugkit-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
 .plugkit-toggle .track {
   position: relative;

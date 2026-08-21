@@ -22,7 +22,8 @@ function flush() {
   if (pending === 0) return;
   const count = pending;
   pending = 0;
-  void adBlockedChannel.send({ count });
+  // background 可能休眠/未就绪；统计丢失可接受，但需吞掉 rejection
+  void adBlockedChannel.send({ count }).catch(() => {});
 }
 
 function remove(el: Element): boolean {

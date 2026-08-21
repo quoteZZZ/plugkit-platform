@@ -2,37 +2,69 @@
   {
     "id": 101,
     "priority": 1,
-    "action": { "type": "block" },
+    "action": {
+      "type": "block"
+    },
     "condition": {
       "urlFilter": "||bilivideo.cn",
-      "resourceTypes": ["xmlhttprequest", "media", "websocket", "other", "ping"]
+      "resourceTypes": [
+        "xmlhttprequest",
+        "media",
+        "websocket",
+        "other",
+        "ping"
+      ]
     }
   },
   {
     "id": 102,
     "priority": 1,
-    "action": { "type": "block" },
+    "action": {
+      "type": "block"
+    },
     "condition": {
-      "urlFilter": "pcdn.biliapi.net",
-      "resourceTypes": ["xmlhttprequest", "media", "websocket", "other", "ping"]
+      "urlFilter": "||pcdn.biliapi.net",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "media",
+        "websocket",
+        "other",
+        "ping"
+      ]
     }
   },
   {
     "id": 103,
     "priority": 1,
-    "action": { "type": "block" },
+    "action": {
+      "type": "block"
+    },
     "condition": {
       "urlFilter": "||yfcdn.net",
-      "resourceTypes": ["xmlhttprequest", "media", "websocket", "other", "ping"]
+      "resourceTypes": [
+        "xmlhttprequest",
+        "media",
+        "websocket",
+        "other",
+        "ping"
+      ]
     }
   },
   {
     "id": 104,
     "priority": 1,
-    "action": { "type": "block" },
+    "action": {
+      "type": "block"
+    },
     "condition": {
       "urlFilter": "||ppio.cloud",
-      "resourceTypes": ["xmlhttprequest", "media", "websocket", "other", "ping"]
+      "resourceTypes": [
+        "xmlhttprequest",
+        "media",
+        "websocket",
+        "other",
+        "ping"
+      ]
     }
   }
 ]

@@ -1,4 +1,5 @@
-// 日志视图组件：级别过滤 + 刷新 + 清空 + 深色日志列表
+// 日志视图组件：级别过滤 + 刷新 + 清空 + 深色日志列表（新日志自动滚动到底部）
+import { useEffect, useRef } from 'react';
 import type { LogEntry, LogLevel } from '@plugkit/core';
 
 const LEVEL_ORDER: LogLevel[] = ['debug', 'info', 'warn', 'error'];
@@ -13,7 +14,10 @@ const LEVEL_COLOR: Record<LogLevel, string> = {
 function fmtTime(ts: number): string {
   const d = new Date(ts);
   const p = (n: number) => String(n).padStart(2, '0');
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  const sameDay = d.toDateString() === new Date().toDateString();
+  // 当日只显示时分秒；跨天补 MM-DD 前缀，便于追踪
+  if (sameDay) return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 export function LogPanel(props: {
@@ -27,6 +31,14 @@ export function LogPanel(props: {
   const { logs, loading, minLevel, onMinLevel, onRefresh, onClear } = props;
   const threshold = LEVEL_ORDER.indexOf(minLevel);
   const visible = logs.filter((e) => LEVEL_ORDER.indexOf(e.level) >= threshold);
+
+  const listRef = useRef<HTMLDivElement>(null);
+  // 日志条数变化（新增/清空）时滚动到底部，保证最新可见
+  const count = visible.length;
+  useEffect(() => {
+    const el = listRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [count]);
 
   return (
     <div>
@@ -50,7 +62,7 @@ export function LogPanel(props: {
         </button>
       </div>
 
-      <div className="plugkit-log-list">
+      <div className="plugkit-log-list" ref={listRef}>
         {visible.length === 0 ? (
           <div className="plugkit-log-row">
             <span className="plugkit-log-msg" style={{ color: '#8c959f' }}>

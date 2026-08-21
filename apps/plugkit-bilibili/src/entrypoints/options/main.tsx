@@ -112,9 +112,35 @@ function App() {
       <Group title="▶️ 播放增强">
         <Toggle label="播放增强总开关" checked={settings.playerEnhance} onChange={(v) => onToggle({ playerEnhance: v })} />
         <Field label="自定义倍速">
-          <input className="plugkit-input" type="number" step="0.1" value={speedInput} onChange={(e) => setSpeedInput(e.target.value)} style={{ width: 80 }} />
-          <button className="plugkit-btn" onClick={onSpeed} style={{ marginLeft: 8 }}>应用</button>
-          <span className="pk-stat-sub">0.1 – 16</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              type="range"
+              min={0.5}
+              max={3}
+              step={0.05}
+              value={speedInput}
+              onChange={(e) => setSpeedInput(e.target.value)}
+              style={{ width: 140, verticalAlign: 'middle' }}
+            />
+            <span style={{ minWidth: 42, fontSize: 13 }}>{Number(speedInput).toFixed(2)}x</span>
+            {[0.75, 1, 1.25, 1.5, 2].map((p) => (
+              <button
+                key={p}
+                className="plugkit-btn"
+                style={{ padding: '2px 8px', fontSize: 12 }}
+                onClick={() => {
+                  setSpeedInput(String(p));
+                  void onToggle({ customSpeed: p });
+                }}
+              >
+                {p}x
+              </button>
+            ))}
+            <button className="plugkit-btn" onClick={onSpeed} style={{ padding: '2px 10px', fontSize: 12 }}>
+              应用
+            </button>
+            <span className="pk-stat-sub">0.5 – 3（手动输入可 0.1 – 16）</span>
+          </div>
         </Field>
         <Toggle label="自动宽屏" checked={settings.autoWidescreen} onChange={(v) => onToggle({ autoWidescreen: v })} />
         <Toggle label="记忆播放进度" checked={settings.rememberProgress} onChange={(v) => onToggle({ rememberProgress: v })} />

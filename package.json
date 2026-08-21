@@ -5,6 +5,8 @@
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "create-plugkit": "node scripts/create-plugkit.mjs",
+    "sync-rules": "node scripts/sync-rules.mjs",
+    "sync-dist": "node scripts/sync-dist.mjs",
     "build": "pnpm -r build"
   }
 }

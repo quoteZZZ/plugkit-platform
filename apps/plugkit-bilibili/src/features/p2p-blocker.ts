@@ -8,7 +8,10 @@ export function startP2pBlocker(): void {
   const proto = window.RTCDataChannel?.prototype;
   if (!proto || typeof proto.send !== 'function') return;
 
-  // 开关状态：storage 为准；document_start 异步读取前的兜底默认开
+  // 开关状态：storage 为准；document_start 异步读取前的兜底默认开。
+  // 设计意图：阻止上传是安全敏感操作，读取设置完成前宁可误拦（默认 true）
+  // 也不放行，避免"用户已关闭开关却因竞态泄漏上行数据"；storage.get 为异步，
+  // 无法在 document_start 同步消除该窗口，故保守优先。
   let block = true;
   void settingsStore.get().then((s) => {
     block = s.masterOn && s.blockP2p;
@@ -28,7 +31,9 @@ export function startP2pBlocker(): void {
     const calls = accCalls;
     accBytes = 0;
     accCalls = 0;
-    void p2pBlockedChannel.send({ bytes, calls });
+    // background 可能尚未就绪/已休眠，统计丢失可接受（核心拦截在页面内完成），
+    // 但必须吞掉 rejection 避免 unhandled promise rejection。
+    void p2pBlockedChannel.send({ bytes, calls }).catch(() => {});
   };
 
   proto.send = function (

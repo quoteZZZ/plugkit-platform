@@ -3,6 +3,7 @@ export { Popup } from './components/Popup';
 export { OptionsPage } from './components/OptionsPage';
 export { Field } from './components/Field';
 export { Toggle } from './components/Toggle';
+export { Button } from './components/Button';
 export { StatCard } from './components/StatCard';
 export { SectionTitle } from './components/SectionTitle';
 export { Badge } from './components/Badge';

@@ -53,9 +53,15 @@
 ```
 
 ## 6. 长期存储（GitHub 不可达时）
-- 源码位于 `/workspace/plugkit-platform`（沙箱持久，但绑定本环境）。
-- 已初始化本地 git；定期 `git archive` 产出干净 zip 供下载到本机。
+- 源码位于 `C:\Users\v1589\Desktop\PlugKit\plugkit-platform`（本机持久，**必须使用非中文/纯 ASCII 路径**）。
+- **路径硬约束**：wxt(vite/rolldown) 在含中文的路径下构建会静默丢失产物（rolldown 原生写盘失败）。项目曾位于 `Desktop\插件` 时构建异常，已迁移至 `Desktop\PlugKit`。切勿将项目放入含中文的目录。
+- 已初始化本地 git；定期 `git archive` 产出干净 zip 供下载。
 - 回到可联网机器后用 token 推 GitHub（建议先吊销暴露过的旧 token）。
+
+**构建产物一键同步（避免源码/产物仓库漂移）**：
+- `pnpm sync-rules`：从 `apps/plugkit-bilibili/src/shared/pcdn-patterns.json`（域名单一真源）重新生成 DNR 规则 `public/rules_*.json`，并校验 `host_permissions` 覆盖。**改 PCDN 域名只改这一处 JSON，再跑本命令**。
+- `pnpm sync-dist`：把各插件 `.output/chrome-mv3` 同步到仓库外同名构建产物目录（默认上一级，即 `Desktop\PlugKit`）并自动 git 提交。改 `PLUGKIT_DIST_ROOT` 可指定其他目标根。
+- 流程：`pnpm -r build` 通过 → `pnpm sync-dist` 同步构建产物。
 
 **项目盘定期同步（硬性）**：每个阶段验证通过（构建 + 类型检查全绿）后，**立即**将成果上传到项目盘对应目录，不拖延、不攒批：
 - 规范 / 契约文档（`DEV_PROCESS.md`、`CONTRACT.md`）→ **需求文档**

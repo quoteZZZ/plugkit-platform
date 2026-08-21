@@ -1,0 +1,4 @@
+{
+  "base": ["mcdn.bilivideo.cn", "szbdyd.com", "onethingpcs.com"],
+  "aggressive": ["bilivideo.cn", "pcdn.biliapi.net", "yfcdn.net", "ppio.cloud"]
+}

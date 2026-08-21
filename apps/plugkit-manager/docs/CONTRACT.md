@@ -72,4 +72,9 @@
 - **平台**：用 `sendToExtension(pluginId, PLUGKIT_STATUS_CHANNEL, undefined)` 发起；自身（manager）直接读本地 storage，不走消息。
 - **连接许可**：被管理插件**不声明** `externally_connectable` 时，Chrome 默认允许所有扩展连接；信封上的 `__plugkit__` 标识用于隔离，非本系列消息会被忽略。
 
+> **`externally_connectable` 安全考量（为何保持不声明）**
+> - 当前全部插件以「加载已解压的扩展程序」方式开发/使用，其 extension ID 由**加载路径决定且不稳定**；若显式声明 `externally_connectable: { ids: [...] }`，路径变化或重装后 ID 变更即导致跨插件日志监测静默失效。
+> - 因此保持不声明：接受「任何扩展都可发起连接」的权限面，用 `__plugkit__` 信封 + 通道名白名单做第一道隔离；被管理插件不返回任何业务敏感数据，仅回日志（`LogEntry` 无 Cookie/Token）。
+> - 若将来上架商店（store 发布时 ID 固定），建议在 manifest 显式收窄为 `externally_connectable: { ids: ["<manager的固定ID>"] }`，并将本说明同步删除。
+
 核心实现位于 `packages/plugkit-core/src/{logger,messaging}`：`createLogger` 除输出 console 外，把最近 200 条日志防抖写入 `chrome.storage.local`（键 `plugkit:logs`），`getLogs()/clearLogs()` 供读取与清空。

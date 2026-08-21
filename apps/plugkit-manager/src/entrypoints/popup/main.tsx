@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
-import { Popup, Toggle, SectionTitle, Badge } from '@plugkit/core/ui';
+import { Popup, Toggle, SectionTitle, Badge, Button } from '@plugkit/core/ui';
 import type { LogLevel } from '@plugkit/core';
 import { LogPanel } from '../../components/LogPanel';
 import { settingsStore, type HubSettings } from '../../shared/types';
@@ -18,16 +18,6 @@ interface ManagedPlugin {
   category?: string;
   isSelf: boolean;
 }
-
-const btnStyle: React.CSSProperties = {
-  fontSize: 12,
-  padding: '3px 10px',
-  borderRadius: 6,
-  border: '1px solid #d0d7de',
-  background: '#f6f8fa',
-  cursor: 'pointer',
-};
-const dangerStyle: React.CSSProperties = { color: '#cf222e', borderColor: '#f0c2c5' };
 
 function PluginRow(props: {
   p: ManagedPlugin;
@@ -81,14 +71,14 @@ function PluginRow(props: {
             <Toggle label="启用" checked={p.enabled} onChange={onToggle} />
           )}
           {p.optionsUrl && (
-            <button style={btnStyle} onClick={onOpen}>
+            <Button onClick={onOpen} style={{ padding: '3px 10px', fontSize: 12 }}>
               {p.isSelf ? '设置' : '配置'}
-            </button>
+            </Button>
           )}
           {!p.isSelf && (
-            <button style={{ ...btnStyle, ...dangerStyle }} onClick={onUninstall}>
+            <Button variant="danger" onClick={onUninstall} style={{ padding: '3px 10px', fontSize: 12 }}>
               卸载
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -179,6 +169,16 @@ function App() {
   React.useEffect(() => {
     if (tab === 'logs' && logTarget) void refreshLogs(logTarget);
   }, [tab, logTarget, refreshLogs]);
+
+  // 日志 tab 轮询自动刷新：按自动刷新间隔持续拉取最新日志
+  React.useEffect(() => {
+    if (tab !== 'logs' || !logTarget || !settings.logMonitor) return;
+    const t = setInterval(
+      () => void refreshLogs(logTarget),
+      Math.max(2, settings.refreshSeconds) * 1000,
+    );
+    return () => clearInterval(t);
+  }, [tab, logTarget, settings.logMonitor, settings.refreshSeconds, refreshLogs]);
 
   const onToggle = async (p: ManagedPlugin, enabled: boolean) => {
     await browser.management.setEnabled(p.id, enabled);

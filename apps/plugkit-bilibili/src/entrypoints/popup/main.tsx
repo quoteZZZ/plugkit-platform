@@ -6,6 +6,7 @@ import {
   StateSnapshot,
   getStateChannel,
   checkinChannel,
+  setMasterChannel,
   updateSettingsChannel,
   BiliSettings,
 } from '../../shared/types';
@@ -41,6 +42,12 @@ function App() {
 
   const onToggle = async (patch: Partial<BiliSettings>) => {
     await updateSettingsChannel.send({ patch });
+    await reload();
+  };
+
+  const onToggleMaster = async (v: boolean) => {
+    // 总开关走专用通道，确保 DNR 规则集同步启停
+    await setMasterChannel.send({ on: v });
     await reload();
   };
 
@@ -91,6 +98,20 @@ function App() {
         </Badge>
       </div>
 
+      <SectionTitle>拦截总开关</SectionTitle>
+      <div className="plugkit-card" style={{ padding: '2px 14px' }}>
+        <Toggle
+          label="PCDN / 上传拦截"
+          checked={settings.masterOn}
+          onChange={onToggleMaster}
+        />
+        <p className="pk-stat-sub" style={{ margin: '2px 0 8px' }}>
+          {settings.masterOn
+            ? `已启用 · 档位：${settings.aggressive ? '激进' : '标准'}（详设中可切换）`
+            : '已停用，视频走原始 CDN（网页净化等其余功能不受影响）'}
+        </p>
+      </div>
+
       <SectionTitle>今日统计</SectionTitle>
       <StatCard
         label="PCDN 拦截（精确）"
@@ -117,9 +138,15 @@ function App() {
       </div>
 
       <SectionTitle>操作</SectionTitle>
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button className="plugkit-btn plugkit-btn-primary" onClick={onCheckin}>
           立即签到
+        </button>
+        <button
+          className="plugkit-btn"
+          onClick={() => void browser.tabs.create({ url: 'https://www.bilibili.com/' })}
+        >
+          打开 B 站
         </button>
         <button
           className="plugkit-btn"

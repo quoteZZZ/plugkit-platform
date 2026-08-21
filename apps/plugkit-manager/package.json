@@ -2,11 +2,11 @@
   "name": "@plugkit/plugin-manager",
   "version": "0.1.0",
   "scripts": {
-    "dev": "wxt",
-    "build": "wxt build",
-    "build:firefox": "wxt build -b firefox",
+    "dev": "pnpm exec wxt",
+    "build": "pnpm exec wxt build",
+    "build:firefox": "pnpm exec wxt build -b firefox",
     "typecheck": "tsc --noEmit",
-    "zip": "wxt zip"
+    "zip": "pnpm exec wxt zip"
   },
   "dependencies": {
     "@plugkit/core": "workspace:*",
