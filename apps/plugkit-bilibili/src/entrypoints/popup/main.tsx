@@ -36,7 +36,7 @@ function TrendChart({ daily }: { daily: DayStat[] }) {
 
   const max = Math.max(...points.map((p) => p.value), 1);
   const W = 280;
-  const H = 64;
+  const H = 50;
   const pad = 5;
   const stepX = (W - pad * 2) / (points.length - 1);
   const y = (v: number) => H - pad - (v / max) * (H - pad * 2);
@@ -213,16 +213,23 @@ function App() {
       )}
 
       <SectionTitle>拦截总开关</SectionTitle>
-      <div className="plugkit-card" style={{ padding: '2px 14px' }}>
+      <div
+        className="plugkit-card"
+        style={{
+          padding: '4px 14px',
+          background: settings.masterOn ? 'var(--pk-accent-weak)' : undefined,
+          borderColor: settings.masterOn ? 'var(--pk-accent)' : undefined,
+        }}
+      >
         <Toggle
           label="PCDN / 上传拦截"
           checked={settings.masterOn}
           onChange={(v) => void onToggle({ masterOn: v })}
         />
-        <p className="pk-stat-sub" style={{ margin: '2px 0 8px' }}>
+        <p className="pk-stat-sub" style={{ margin: '2px 0 6px' }}>
           {settings.masterOn
-            ? `已启用 · 档位：${settings.aggressive ? '激进' : '标准'}`
-            : '已停用，视频走原始 CDN（网页净化等其余功能不受影响）'}
+            ? `档位：${settings.aggressive ? '激进' : '标准'}`
+            : '已停用（净化/增强等其余功能不受影响）'}
         </p>
       </div>
 
@@ -231,19 +238,19 @@ function App() {
         <StatCard
           label="PCDN 拦截"
           value={String(stats.todayPcdn)}
-          sub={`累计 ${stats.totalPcdn} 次 · 估算省 ${todayEstimatedMB} MB`}
+          sub={`估算省 ${todayEstimatedMB} MB`}
         />
         <StatCard
           label="阻止上传"
           value={fmtBytes(stats.todayP2pBytes)}
           sub={`${stats.todayP2pCalls} 次调用`}
         />
+        <StatCard
+          label="清理广告"
+          value={String(stats.todayAdRemoved)}
+          sub={`累计 ${stats.totalAdRemoved} 个`}
+        />
       </div>
-      <StatCard
-        label="清理广告"
-        value={String(stats.todayAdRemoved)}
-        sub={`累计 ${stats.totalAdRemoved} 个`}
-      />
 
       {stats.daily.length > 0 && <TrendChart daily={stats.daily} />}
 
