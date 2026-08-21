@@ -140,6 +140,8 @@ export interface StateSnapshot {
   /** 估算省流量（MB）：今日 / 累计 */
   todayEstimatedMB: number;
   totalEstimatedMB: number;
+  /** 后台自诊断：最近捕获的后台错误（用于 UI 定位问题） */
+  bgErrors?: string[];
 }
 
 /** 签到结果 */

@@ -8,6 +8,8 @@ export default defineConfig({
   manifest: {
     name: 'PlugKit Bilibili（B站管理）',
     description: 'B 站统一管理：PCDN/直播上传拦截、广告净化、播放增强、弹幕管理、账号工具与流量统计',
+    // 显式声明：允许所有扩展连接，确保 plugkit-manager 能跨插件拉取日志（与默认行为一致但更明确）
+    externally_connectable: { ids: ['*'] },
     permissions: ['declarativeNetRequest', 'webRequest', 'storage', 'alarms'],
     host_permissions: [
       '*://*.bilibili.com/*',

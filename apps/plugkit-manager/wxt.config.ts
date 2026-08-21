@@ -10,6 +10,8 @@ export default defineConfig({
   manifest: {
     name: 'PlugKit 插件平台',
     description: 'PlugKit 插件平台：集中管理系列浏览器插件，支持开关、配置、卸载与运行日志监测',
+    // 显式声明：允许所有扩展连接（被管理插件/更高层工具可读本平台日志）
+    externally_connectable: { ids: ['*'] },
     permissions: ['management', 'storage'],
     icons: {
       16: 'icons/16.png',

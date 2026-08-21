@@ -95,9 +95,25 @@ function App() {
           <div className="plugkit-card">
             <div className="pk-stat-label">错误</div>
             <div className="pk-stat-value" style={{ fontSize: 14 }}>{error}</div>
-            <Button variant="primary" style={{ marginTop: 10 }} onClick={() => void reload()}>
-              重试
-            </Button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+              <Button variant="primary" onClick={() => void reload()}>
+                重试
+              </Button>
+              <Button
+                variant="danger"
+                onClick={async () => {
+                  // 旧版本/损坏的 storage 数据可致后台异常，重置后重试
+                  await chrome.storage.local.remove(['plugkit:bili:settings', 'plugkit:bili:stats']);
+                  setError('');
+                  await reload();
+                }}
+              >
+                重置插件数据
+              </Button>
+            </div>
+            <p className="pk-stat-sub" style={{ marginTop: 8 }}>
+              重置会清空全部设置与统计，恢复到默认值。
+            </p>
           </div>
         ) : (
           '加载中…'

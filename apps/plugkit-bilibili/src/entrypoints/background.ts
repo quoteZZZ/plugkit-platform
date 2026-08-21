@@ -2,6 +2,8 @@
 // 设计要点（性能）：
 //  - PCDN 拦截由浏览器内核 DNR 完成，后台零参与；
 //  - 后台仅做轻事：webRequest 观察计数、content 上报落库、规则集开关、alarms 签到。
+// 健壮性：所有事件监听器经 safeRegister 注册——单个注册失败不影响其他功能；
+//         捕获的异常记入 bgErrors 供 UI 展示，避免"后台无响应/加载中"黑盒。
 import { defineBackground } from 'wxt/utils/define-background';
 import {
   clearLogs,
@@ -40,6 +42,24 @@ export default defineBackground(() => {
   // 内存缓冲：webRequest 计数先入内存，定期/事件触发 flush（避免频繁写 storage）
   let buf = 0;
   let settings: BiliSettings = { ...DEFAULT_SETTINGS };
+
+  // 后台自诊断：最近捕获的错误（最多 5 条），经 getState 返回给 UI
+  const bgErrors: string[] = [];
+  function recordError(tag: string, e: unknown): void {
+    const msg = `${tag}: ${String(e ?? 'unknown')}`;
+    bgErrors.push(msg);
+    if (bgErrors.length > 5) bgErrors.shift();
+    logger.error(msg);
+  }
+
+  /** 安全注册事件监听器：单个注册抛错不拖垮整个后台 */
+  function safeRegister(tag: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (e) {
+      recordError(`注册失败(${tag})`, e);
+    }
+  }
 
   /** 确保 daily 含当天项并与 today* 同步；截断为最近 7 天 */
   function withDaily(stats: BiliStats): BiliStats {
@@ -86,13 +106,17 @@ export default defineBackground(() => {
 
   /** 把内存计数落库（daily 与今日项同步） */
   async function flush() {
-    const stats = roll(await statsStore.get());
-    if (buf > 0) {
-      stats.todayPcdn += buf;
-      stats.totalPcdn += buf;
-      buf = 0;
+    try {
+      const stats = roll(await statsStore.get());
+      if (buf > 0) {
+        stats.todayPcdn += buf;
+        stats.totalPcdn += buf;
+        buf = 0;
+      }
+      await statsStore.set(withDaily(stats));
+    } catch (e) {
+      recordError('flush', e);
     }
-    await statsStore.set(withDaily(stats));
   }
 
   /** 白名单域名命中判断（URL 是否属于任一例外域名） */
@@ -123,7 +147,7 @@ export default defineBackground(() => {
       await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
       if (clean.length > 0) logger.info(`白名单已同步：${clean.join(', ')}`);
     } catch (e) {
-      logger.error('同步白名单失败', e);
+      recordError('同步白名单', e);
     }
   }
 
@@ -145,7 +169,7 @@ export default defineBackground(() => {
           enableRulesetIds: toEnable,
           disableRulesetIds: toDisable,
         })
-        .catch((e) => logger.error('更新 DNR 规则集失败', e));
+        .catch((e) => recordError('更新规则集', e));
     }
     // 白名单与规则集同步
     await syncAllowlist(s.pcdnAllowlist);
@@ -182,116 +206,175 @@ export default defineBackground(() => {
       logger.info('Bilibili 管理已初始化');
     } catch (e) {
       // 初始化失败不应拖垮整个后台（否则 popup 消息将永久无响应，表现为"一直加载中"）
-      logger.error('初始化失败', e);
+      recordError('初始化', e);
     }
   })();
 
   // —— 1) PCDN 请求计数（observe 模式，非阻塞）——
-  chrome.webRequest.onBeforeRequest.addListener(
-    (detail) => {
-      // 白名单命中的请求不算拦截（已被 allow 规则放行），避免统计虚高
-      if (settings.masterOn && !isAllowlisted(detail.url) && matchesPcdn(detail.url, settings.aggressive)) {
-        buf += 1;
-        if (buf >= 20) void flush();
-      }
-    },
-    WEB_REQUEST_FILTER,
-  );
+  safeRegister('webRequest', () => {
+    chrome.webRequest.onBeforeRequest.addListener(
+      (detail) => {
+        // 白名单命中的请求不算拦截（已被 allow 规则放行），避免统计虚高
+        if (settings.masterOn && !isAllowlisted(detail.url) && matchesPcdn(detail.url, settings.aggressive)) {
+          buf += 1;
+          if (buf >= 20) void flush();
+        }
+      },
+      WEB_REQUEST_FILTER,
+    );
+  });
 
   // 定期落库 + SW 休眠前兜底
-  setInterval(() => void flush(), 30_000);
-  chrome.runtime.onSuspend?.addListener(() => void flush());
+  safeRegister('interval', () => setInterval(() => void flush(), 30_000));
+  safeRegister('onSuspend', () => chrome.runtime.onSuspend?.addListener(() => void flush()));
 
   // —— 2) alarms：每日签到 ——
-  chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'plugkit-bili-checkin') {
-      void settingsStore.get().then((s) => {
-        if (s.autoCheckin) {
-          void doCheckin().then((r) => logger.info('自动签到:', r.msg));
-        }
-      });
-    }
+  safeRegister('alarms', () => {
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (alarm.name === 'plugkit-bili-checkin') {
+        void settingsStore.get().then((s) => {
+          if (s.autoCheckin) {
+            void doCheckin().then((r) => logger.info('自动签到:', r.msg));
+          }
+        });
+      }
+    });
   });
 
   // —— 3) 消息通道 ——
-  p2pBlockedChannel.on(async (data) => {
-    const stats = roll(await statsStore.get());
-    stats.todayP2pCalls += data.calls;
-    stats.totalP2pCalls += data.calls;
-    stats.todayP2pBytes += data.bytes;
-    stats.totalP2pBytes += data.bytes;
-    await statsStore.set(withDaily(stats));
+  safeRegister('p2pBlocked', () => {
+    p2pBlockedChannel.on(async (data) => {
+      try {
+        const stats = roll(await statsStore.get());
+        stats.todayP2pCalls += data.calls;
+        stats.totalP2pCalls += data.calls;
+        stats.todayP2pBytes += data.bytes;
+        stats.totalP2pBytes += data.bytes;
+        await statsStore.set(withDaily(stats));
+      } catch (e) {
+        recordError('p2pBlocked', e);
+      }
+    });
   });
 
-  adBlockedChannel.on(async ({ count }) => {
-    const stats = roll(await statsStore.get());
-    stats.todayAdRemoved += count;
-    stats.totalAdRemoved += count;
-    await statsStore.set(withDaily(stats));
+  safeRegister('adBlocked', () => {
+    adBlockedChannel.on(async ({ count }) => {
+      try {
+        const stats = roll(await statsStore.get());
+        stats.todayAdRemoved += count;
+        stats.totalAdRemoved += count;
+        await statsStore.set(withDaily(stats));
+      } catch (e) {
+        recordError('adBlocked', e);
+      }
+    });
   });
 
-  getStateChannel.on(async () => {
-    // 全链路兜底：任何一步失败都返回安全快照，避免 sendMessage resolve undefined
-    // 导致 popup 永久"加载中" / options 报 TypeError。
-    try {
-      await flush().catch(() => {});
-      const stats = await statsStore.get().catch(() => ({ ...DEFAULT_STATS }));
-      const s = await settingsStore.get().catch(() => ({ ...DEFAULT_SETTINGS }));
-      const rulesets = await chrome.declarativeNetRequest.getEnabledRulesets().catch(() => []);
-      const todayEstimatedMB = Math.round(stats.todayPcdn * s.avgChunkMB * 10) / 10;
-      const totalEstimatedMB = Math.round(stats.totalPcdn * s.avgChunkMB * 10) / 10;
-      return { stats, settings: s, enabledRulesets: rulesets, todayEstimatedMB, totalEstimatedMB };
-    } catch (e) {
-      logger.error('getState 处理异常', e);
-      return { stats: { ...DEFAULT_STATS }, settings: { ...DEFAULT_SETTINGS }, enabledRulesets: [], todayEstimatedMB: 0, totalEstimatedMB: 0 };
-    }
+  safeRegister('getState', () => {
+    getStateChannel.on(async () => {
+      // 全链路兜底：任何一步失败都返回安全快照 + 诊断，避免 sendMessage resolve undefined
+      try {
+        await flush().catch(() => {});
+        const stats = await statsStore.get().catch(() => ({ ...DEFAULT_STATS }));
+        const s = await settingsStore.get().catch(() => ({ ...DEFAULT_SETTINGS }));
+        const rulesets = await chrome.declarativeNetRequest.getEnabledRulesets().catch(() => []);
+        const todayEstimatedMB = Math.round(stats.todayPcdn * s.avgChunkMB * 10) / 10;
+        const totalEstimatedMB = Math.round(stats.totalPcdn * s.avgChunkMB * 10) / 10;
+        return {
+          stats,
+          settings: s,
+          enabledRulesets: rulesets,
+          todayEstimatedMB,
+          totalEstimatedMB,
+          bgErrors: bgErrors.slice(),
+        };
+      } catch (e) {
+        recordError('getState', e);
+        return {
+          stats: { ...DEFAULT_STATS },
+          settings: { ...DEFAULT_SETTINGS },
+          enabledRulesets: [],
+          todayEstimatedMB: 0,
+          totalEstimatedMB: 0,
+          bgErrors: bgErrors.slice(),
+        };
+      }
+    });
   });
 
-  setAggressiveChannel.on(async ({ on }) => {
-    await settingsStore.set({ aggressive: on });
-    await applyRulesets();
-  });
-
-  setMasterChannel.on(async ({ on }) => {
-    await settingsStore.set({ masterOn: on });
-    await applyRulesets();
-  });
-
-  setBlockP2pChannel.on(async ({ on }) => {
-    await settingsStore.set({ blockP2p: on });
-  });
-
-  resetStatsChannel.on(async () => {
-    buf = 0;
-    await statsStore.set(withDaily({ ...DEFAULT_STATS, today: todayStr() }));
-  });
-
-  setChunkChannel.on(async ({ mb }) => {
-    const v = Math.max(0.5, Math.min(20, mb));
-    await settingsStore.set({ avgChunkMB: v });
-  });
-
-  updateSettingsChannel.on(async ({ patch }) => {
-    await settingsStore.set(patch);
-    if ('masterOn' in patch || 'aggressive' in patch || 'pcdnAllowlist' in patch) {
+  safeRegister('setAggressive', () => {
+    setAggressiveChannel.on(async ({ on }) => {
+      await settingsStore.set({ aggressive: on });
       await applyRulesets();
-    }
+    });
   });
 
-  checkinChannel.on(async () => doCheckin());
+  safeRegister('setMaster', () => {
+    setMasterChannel.on(async ({ on }) => {
+      await settingsStore.set({ masterOn: on });
+      await applyRulesets();
+    });
+  });
+
+  safeRegister('setBlockP2p', () => {
+    setBlockP2pChannel.on(async ({ on }) => {
+      await settingsStore.set({ blockP2p: on });
+    });
+  });
+
+  safeRegister('resetStats', () => {
+    resetStatsChannel.on(async () => {
+      buf = 0;
+      await statsStore.set(withDaily({ ...DEFAULT_STATS, today: todayStr() }));
+    });
+  });
+
+  safeRegister('setChunk', () => {
+    setChunkChannel.on(async ({ mb }) => {
+      const v = Math.max(0.5, Math.min(20, mb));
+      await settingsStore.set({ avgChunkMB: v });
+    });
+  });
+
+  safeRegister('updateSettings', () => {
+    updateSettingsChannel.on(async ({ patch }) => {
+      await settingsStore.set(patch);
+      if ('masterOn' in patch || 'aggressive' in patch || 'pcdnAllowlist' in patch) {
+        await applyRulesets();
+      }
+    });
+  });
+
+  safeRegister('checkin', () => {
+    checkinChannel.on(async () => doCheckin());
+  });
 
   // —— 4) 跨插件状态桥：供 plugkit-manager 拉取本插件日志 ——
-  onExternalMessage(PLUGKIT_STATUS_CHANNEL, async () => {
-    const logs = await getLogs();
-    return {
-      pluginId: 'bilibili',
-      version: chrome.runtime.getManifest().version,
-      logs,
-    };
+  safeRegister('externalStatus', () => {
+    onExternalMessage(PLUGKIT_STATUS_CHANNEL, async () => {
+      try {
+        const logs = await getLogs();
+        return {
+          pluginId: 'bilibili',
+          version: chrome.runtime.getManifest().version,
+          logs,
+        };
+      } catch (e) {
+        recordError('externalStatus', e);
+        return { pluginId: 'bilibili', version: chrome.runtime.getManifest().version, logs: [] };
+      }
+    });
   });
 
-  onExternalMessage(PLUGKIT_CLEAR_LOGS_CHANNEL, async () => {
-    await clearLogs();
-    return { ok: true };
+  safeRegister('externalClearLogs', () => {
+    onExternalMessage(PLUGKIT_CLEAR_LOGS_CHANNEL, async () => {
+      try {
+        await clearLogs();
+        return { ok: true };
+      } catch (e) {
+        recordError('externalClearLogs', e);
+        return { ok: false };
+      }
+    });
   });
 });

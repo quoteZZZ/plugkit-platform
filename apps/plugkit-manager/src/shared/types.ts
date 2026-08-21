@@ -24,7 +24,8 @@ export const DEFAULT_SETTINGS: HubSettings = {
   refreshSeconds: 5,
   logMonitor: true,
   maxLogs: 100,
-  minLogLevel: 'info',
+  // 默认只显示异常日志（warn/error），便于排查；需要时可下调级别
+  minLogLevel: 'error',
 };
 
 export const settingsStore = createStorage<HubSettings>('hub:settings', DEFAULT_SETTINGS);
