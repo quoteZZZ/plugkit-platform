@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { Popup, Field } from '@plugkit/core/ui';
+import { Popup, Field, Button } from '@plugkit/core/ui';
 import { defineChannel } from '@plugkit/core/messaging';
 import { createStorage } from '@plugkit/core/storage';
 import { getActiveTab } from '@plugkit/core/platform';
@@ -50,9 +50,11 @@ function App() {
       <h3>当前页面</h3>
       <Field label="标题">{title}</Field>
       <Field label="URL">{url}</Field>
-      <button onClick={copy}>复制标题与URL</button>
-      <button onClick={doPing}>Ping 后台</button>
-      <button onClick={fromPage}>从页面取标题</button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Button onClick={copy}>复制标题与URL</Button>
+        <Button onClick={doPing}>Ping 后台</Button>
+        <Button onClick={fromPage}>从页面取标题</Button>
+      </div>
       <p style={{ fontSize: 12, color: '#57606a', margin: '8px 0 0' }}>{resp}</p>
     </Popup>
   );
