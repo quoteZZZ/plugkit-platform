@@ -61,7 +61,13 @@
 **构建产物一键同步（避免源码/产物仓库漂移）**：
 - `pnpm sync-rules`：从 `apps/plugkit-bilibili/src/shared/pcdn-patterns.json`（域名单一真源）重新生成 DNR 规则 `public/rules_*.json`，并校验 `host_permissions` 覆盖。**改 PCDN 域名只改这一处 JSON，再跑本命令**。
 - `pnpm sync-dist`：把各插件 `.output/chrome-mv3` 同步到仓库外同名构建产物目录（默认上一级，即 `Desktop\PlugKit`）并自动 git 提交。改 `PLUGKIT_DIST_ROOT` 可指定其他目标根。
-- 流程：`pnpm -r build` 通过 → `pnpm sync-dist` 同步构建产物。
+- 流程：构建通过 → `pnpm sync-dist` 同步构建产物。
+
+**构建命令硬性说明（Windows 环境已验证）**：
+- ❌ **不要用 `pnpm run build` / `pnpm -r build`**：本机 pnpm 通过 cmd.exe 调用 `.bin/wxt.CMD` shim 会**静默失败**（无报错、产物不生成）。
+- ✅ 使用 `pnpm exec wxt build`（各 app 目录内）或 `npx wxt build`；项目脚本已统一写成 `pnpm exec wxt ...`。
+- ✅ `pnpm -r typecheck` 也可能卡死，用 `pnpm --filter <包> typecheck` 逐个跑。
+- ✅ sync 脚本若经 pnpm run 无输出，直接 `node scripts/sync-rules.mjs` / `node scripts/sync-dist.mjs`。
 
 **项目盘定期同步（硬性）**：每个阶段验证通过（构建 + 类型检查全绿）后，**立即**将成果上传到项目盘对应目录，不拖延、不攒批：
 - 规范 / 契约文档（`DEV_PROCESS.md`、`CONTRACT.md`）→ **需求文档**
