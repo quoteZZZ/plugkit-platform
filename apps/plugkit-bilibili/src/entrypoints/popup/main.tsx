@@ -91,7 +91,6 @@ function App() {
     bgErrors: string[];
   } | null>(null);
   const [error, setError] = React.useState('');
-  const [checkin, setCheckin] = React.useState('');
 
   const reload = React.useCallback(async () => {
     // 纯 storage 直读（不依赖后台消息通道）
@@ -138,20 +137,6 @@ function App() {
 
   const onToggle = async (patch: Partial<BiliSettings>) => {
     await writeSettings(patch);
-  };
-
-  const onCheckin = async () => {
-    setCheckin('签到中…');
-    // popup 直连 B 站接口（有 host_permissions + credentials 带登录 cookie）
-    try {
-      const res = await fetch('https://api.bilibili.com/x/sign/doSign', { credentials: 'include' });
-      const json = (await res.json()) as { code: number; message?: string; data?: { text?: string } };
-      if (json.code === 0) setCheckin(json.data?.text ?? '签到成功');
-      else if (json.code === -101) setCheckin('未登录 B 站，签到失败');
-      else setCheckin(json.message ?? `签到失败(code=${json.code})`);
-    } catch {
-      setCheckin('签到失败：网络错误');
-    }
   };
 
   if (error) {
@@ -270,9 +255,6 @@ function App() {
 
       <SectionTitle>操作</SectionTitle>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Button variant="primary" onClick={() => void onCheckin()}>
-          立即签到
-        </Button>
         <Button onClick={() => void browser.tabs.create({ url: 'https://www.bilibili.com/' })}>
           打开 B 站
         </Button>
@@ -280,7 +262,6 @@ function App() {
           详细设置
         </Button>
       </div>
-      {checkin && <div className="pk-stat-sub" style={{ marginTop: 8 }}>{checkin}</div>}
     </Popup>
   );
 }
