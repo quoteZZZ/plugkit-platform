@@ -53,25 +53,34 @@ function App() {
   const [checkin, setCheckin] = React.useState('');
 
   const reload = React.useCallback(async () => {
-    try {
-      // 加超时兜底：后台 Service Worker 冷启动/异常时不让界面永久"加载中"
-      const snap = await Promise.race([
-        getStateChannel.send(),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error('后台无响应（可能正在冷启动）。若持续出现，请到 chrome://extensions 刷新该插件后重试。')),
-            4000,
+    // SW 冷启动竞态：第一次 sendMessage 可能因后台唤醒未完成而 resolve undefined。
+    // 自动重试最多 3 次，显著提升冷启动成功率。
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        // 加超时兜底：后台 Service Worker 冷启动/异常时不让界面永久"加载中"
+        const snap = await Promise.race([
+          getStateChannel.send(),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error('后台无响应（可能正在冷启动）。若持续出现，请到 chrome://extensions 刷新该插件后重试。')),
+              4000,
+            ),
           ),
-        ),
-      ]);
-      // 后台异常时 sendMessage 可能 resolve undefined，须显式校验，避免永久"加载中"
-      if (!snap || !snap.settings || !snap.stats) {
-        throw new Error('后台返回异常（疑似旧版本数据）。请到 chrome://extensions 刷新该插件后重试。');
+        ]);
+        // 后台异常时 sendMessage 可能 resolve undefined，须显式校验
+        if (!snap || !snap.settings || !snap.stats) {
+          throw new Error('后台返回异常，请稍候自动重试…');
+        }
+        setSnap(snap);
+        setError('');
+        return;
+      } catch (e) {
+        if (attempt === 2) {
+          setError(String(e));
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 500));
       }
-      setSnap(snap);
-      setError('');
-    } catch (e) {
-      setError(String(e));
     }
   }, []);
 

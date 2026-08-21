@@ -30,25 +30,33 @@ function App() {
   const [allowlistInput, setAllowlistInput] = React.useState('');
 
   const reload = React.useCallback(async () => {
-    try {
-      const s = await Promise.race([
-        getStateChannel.send(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('后台无响应，请到 chrome://extensions 刷新该插件后重试。')), 4000),
-        ),
-      ]);
-      // 后台异常时 sendMessage 可能 resolve undefined，须显式校验
-      if (!s || !s.settings || !s.stats) {
-        throw new Error('后台返回异常（疑似旧版本数据）。请到 chrome://extensions 刷新该插件后重试。');
+    // SW 冷启动竞态：自动重试最多 3 次，提升冷启动成功率
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const s = await Promise.race([
+          getStateChannel.send(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('后台无响应，请到 chrome://extensions 刷新该插件后重试。')), 4000),
+          ),
+        ]);
+        // 后台异常时 sendMessage 可能 resolve undefined，须显式校验
+        if (!s || !s.settings || !s.stats) {
+          throw new Error('后台返回异常，请稍候自动重试…');
+        }
+        setSnap(s);
+        setError('');
+        setChunkInput(String(s.settings.avgChunkMB));
+        setSpeedInput(String(s.settings.customSpeed));
+        setHotkeyInput(s.settings.danmakuHotkey);
+        setAllowlistInput((s.settings.pcdnAllowlist ?? []).join(', '));
+        return;
+      } catch (e) {
+        if (attempt === 2) {
+          setError(String(e));
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 500));
       }
-      setSnap(s);
-      setError('');
-      setChunkInput(String(s.settings.avgChunkMB));
-      setSpeedInput(String(s.settings.customSpeed));
-      setHotkeyInput(s.settings.danmakuHotkey);
-      setAllowlistInput((s.settings.pcdnAllowlist ?? []).join(', '));
-    } catch (e) {
-      setError(String(e));
     }
   }, []);
 
