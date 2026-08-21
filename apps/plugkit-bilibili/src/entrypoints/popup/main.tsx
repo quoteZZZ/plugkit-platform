@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
-import { Popup, Toggle, StatCard, SectionTitle, Badge, Button } from '@plugkit/core/ui';
+import { Popup, Toggle, Badge, Button } from '@plugkit/core/ui';
 import {
   BiliSettings,
   BiliStats,
@@ -14,7 +14,32 @@ import { fmtBytes } from '../../shared/format';
 const SETTINGS_KEY = 'plugkit:bili:settings';
 const STATS_KEY = 'plugkit:bili:stats';
 
-/** 近 7 天 PCDN 拦截趋势折线图（固定 7 天，缺失日期补 0） */
+/** 紧凑统计块（3 列布局用） */
+function MiniStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div
+      style={{
+        background: 'var(--pk-surface)',
+        border: '1px solid var(--pk-border)',
+        borderRadius: 8,
+        padding: '6px 8px',
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 11, color: 'var(--pk-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginTop: 1, whiteSpace: 'nowrap' }}>{value}</div>
+      {sub && (
+        <div style={{ fontSize: 10, color: 'var(--pk-text-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** 近 7 天 PCDN 拦截趋势折线图（紧凑） */
 function TrendChart({ daily }: { daily: DayStat[] }) {
   const points = React.useMemo(() => {
     const map = new Map(daily.map((d) => [d.date, d.pcdn]));
@@ -36,8 +61,8 @@ function TrendChart({ daily }: { daily: DayStat[] }) {
 
   const max = Math.max(...points.map((p) => p.value), 1);
   const W = 280;
-  const H = 50;
-  const pad = 5;
+  const H = 38;
+  const pad = 4;
   const stepX = (W - pad * 2) / (points.length - 1);
   const y = (v: number) => H - pad - (v / max) * (H - pad * 2);
   const path = points
@@ -45,16 +70,23 @@ function TrendChart({ daily }: { daily: DayStat[] }) {
     .join(' ');
 
   return (
-    <div className="plugkit-card pk-stat">
-      <div className="pk-stat-label">近7天拦截趋势（PCDN 次数）</div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ marginTop: 8 }} aria-label="近7天拦截趋势">
-        {/* 网格基线 */}
+    <div
+      style={{
+        marginTop: 8,
+        background: 'var(--pk-surface)',
+        border: '1px solid var(--pk-border)',
+        borderRadius: 8,
+        padding: '6px 10px 4px',
+      }}
+    >
+      <div style={{ fontSize: 11, color: 'var(--pk-text-secondary)' }}>近7天拦截趋势</div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} aria-label="近7天拦截趋势">
         <line x1={pad} y1={y(0)} x2={W - pad} y2={y(0)} stroke="var(--pk-border-soft)" strokeWidth="1" />
         <polyline
           points={path}
           fill="none"
           stroke="var(--pk-accent)"
-          strokeWidth="2"
+          strokeWidth="1.8"
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -63,7 +95,7 @@ function TrendChart({ daily }: { daily: DayStat[] }) {
             key={p.date}
             cx={pad + i * stepX}
             cy={y(p.value)}
-            r="2.6"
+            r="2.2"
             fill="var(--pk-accent)"
             opacity={p.value > 0 ? 1 : 0.35}
           >
@@ -71,9 +103,9 @@ function TrendChart({ daily }: { daily: DayStat[] }) {
           </circle>
         ))}
       </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
         {points.map((p) => (
-          <span key={p.date} style={{ fontSize: 9, color: 'var(--pk-text-muted)' }}>
+          <span key={p.date} style={{ fontSize: 8, color: 'var(--pk-text-muted)' }}>
             {p.label}
           </span>
         ))}
@@ -87,7 +119,6 @@ function App() {
     stats: BiliStats;
     settings: BiliSettings;
     todayEstimatedMB: number;
-    totalEstimatedMB: number;
     bgErrors: string[];
   } | null>(null);
   const [error, setError] = React.useState('');
@@ -98,15 +129,14 @@ function App() {
       const raw = await chrome.storage.local.get([SETTINGS_KEY, STATS_KEY, 'plugkit:bili:heartbeat']);
       const settings = { ...DEFAULT_SETTINGS, ...((raw[SETTINGS_KEY] ?? {}) as Partial<BiliSettings>) };
       const stats = { ...DEFAULT_STATS, ...((raw[STATS_KEY] ?? {}) as Partial<BiliStats>) };
-      const hb = raw['plugkit:bili:heartbeat'] as { ts?: number; ok?: boolean; err?: string } | undefined;
+      const hb = raw['plugkit:bili:heartbeat'] as { ok?: boolean; err?: string } | undefined;
       const todayEstimatedMB = Math.round(stats.todayPcdn * settings.avgChunkMB * 10) / 10;
-      const totalEstimatedMB = Math.round(stats.totalPcdn * settings.avgChunkMB * 10) / 10;
       const bgErrors = hb
         ? hb.ok
           ? []
           : [`后台初始化失败：${hb.err ?? '未知原因'}`]
-        : ['后台未启动（SW 未运行）'];  // 拦截/签到等后台功能需其运行
-      setSnap({ stats, settings, todayEstimatedMB, totalEstimatedMB, bgErrors });
+        : ['后台未启动（SW 未运行）']; // 拦截/签到等后台功能需其运行
+      setSnap({ stats, settings, todayEstimatedMB, bgErrors });
       setError('');
     } catch (e) {
       setError(String(e));
@@ -135,10 +165,6 @@ function App() {
     await chrome.storage.local.set({ [SETTINGS_KEY]: { ...cur, ...patch } });
   };
 
-  const onToggle = async (patch: Partial<BiliSettings>) => {
-    await writeSettings(patch);
-  };
-
   if (error) {
     return (
       <Popup>
@@ -157,12 +183,9 @@ function App() {
                 await reload();
               }}
             >
-              重置插件数据
+              重置数据
             </Button>
           </div>
-          <p className="pk-stat-sub" style={{ marginTop: 8 }}>
-            重置会清空全部设置与统计，恢复到默认值。
-          </p>
         </div>
       </Popup>
     );
@@ -178,14 +201,14 @@ function App() {
     );
   }
 
-  const { stats, settings, todayEstimatedMB, totalEstimatedMB, bgErrors } = snap;
+  const { stats, settings, todayEstimatedMB, bgErrors } = snap;
   const running = settings.masterOn;
 
   return (
     <Popup>
       <div className="plugkit-popup-header">
-        <img src={chrome.runtime.getURL('icons/48.png')} width={28} height={28} style={{ borderRadius: 6 }} alt="" />
-        <h3 style={{ flex: 1 }}>B站管理</h3>
+        <img src={chrome.runtime.getURL('icons/48.png')} width={26} height={26} style={{ borderRadius: 6 }} alt="" />
+        <h3 style={{ flex: 1, fontSize: 14 }}>B站管理</h3>
         <Badge tone={running ? 'success' : 'muted'}>
           {running ? '运行中' : '已停用'}
         </Badge>
@@ -195,8 +218,8 @@ function App() {
         <div
           title={bgErrors.join('；')}
           style={{
-            marginTop: 8,
-            padding: '4px 10px',
+            marginTop: 6,
+            padding: '3px 10px',
             borderRadius: 8,
             background: 'var(--pk-danger-weak)',
             border: '1px solid var(--pk-danger)',
@@ -212,62 +235,45 @@ function App() {
         </div>
       )}
 
-      <SectionTitle>拦截总开关</SectionTitle>
+      {/* 拦截总开关 */}
       <div
         className="plugkit-card"
         style={{
-          padding: '4px 14px',
-          background: settings.masterOn ? 'var(--pk-accent-weak)' : undefined,
-          borderColor: settings.masterOn ? 'var(--pk-accent)' : undefined,
+          marginTop: 8,
+          padding: '2px 12px',
+          background: running ? 'var(--pk-accent-weak)' : undefined,
+          borderColor: running ? 'var(--pk-accent)' : undefined,
         }}
       >
-        <Toggle
-          label="PCDN / 上传拦截"
-          checked={settings.masterOn}
-          onChange={(v) => void onToggle({ masterOn: v })}
-        />
-        <p className="pk-stat-sub" style={{ margin: '2px 0 6px' }}>
-          {settings.masterOn
-            ? `档位：${settings.aggressive ? '激进' : '标准'}`
-            : '已停用（净化/增强等其余功能不受影响）'}
-        </p>
+        <Toggle label="PCDN / 上传拦截" checked={running} onChange={(v) => void writeSettings({ masterOn: v })} />
+        <div className="pk-stat-sub" style={{ margin: '0 0 6px' }}>
+          {running ? `档位：${settings.aggressive ? '激进' : '标准'}` : '已停用（其余功能不受影响）'}
+        </div>
       </div>
 
-      <SectionTitle>今日统计</SectionTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <StatCard
-          label="PCDN 拦截"
-          value={String(stats.todayPcdn)}
-          sub={`估算省 ${todayEstimatedMB} MB`}
-        />
-        <StatCard
-          label="阻止上传"
-          value={fmtBytes(stats.todayP2pBytes)}
-          sub={`${stats.todayP2pCalls} 次调用`}
-        />
-        <StatCard
-          label="清理广告"
-          value={String(stats.todayAdRemoved)}
-          sub={`累计 ${stats.totalAdRemoved} 个`}
-        />
+      {/* 今日统计（3 列） */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 8 }}>
+        <MiniStat label="PCDN 拦截" value={String(stats.todayPcdn)} sub={`省 ${todayEstimatedMB}MB`} />
+        <MiniStat label="阻止上传" value={fmtBytes(stats.todayP2pBytes)} sub={`${stats.todayP2pCalls}次`} />
+        <MiniStat label="清理广告" value={String(stats.todayAdRemoved)} sub={`累计 ${stats.totalAdRemoved}`} />
       </div>
 
       {stats.daily.length > 0 && <TrendChart daily={stats.daily} />}
 
-      <SectionTitle>功能开关</SectionTitle>
-      <div className="plugkit-card" style={{ padding: '4px 14px' }}>
-        <Toggle label="广告净化" checked={settings.adClean} onChange={(v) => void onToggle({ adClean: v })} />
-        <Toggle label="播放增强" checked={settings.playerEnhance} onChange={(v) => void onToggle({ playerEnhance: v })} />
-        <Toggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void onToggle({ danmaku: v })} />
-        <Toggle label="账号工具" checked={settings.accountTools} onChange={(v) => void onToggle({ accountTools: v })} />
+      {/* 功能开关 */}
+      <div className="plugkit-card" style={{ marginTop: 8, padding: '2px 12px' }}>
+        <Toggle label="广告净化" checked={settings.adClean} onChange={(v) => void writeSettings({ adClean: v })} />
+        <Toggle label="播放增强" checked={settings.playerEnhance} onChange={(v) => void writeSettings({ playerEnhance: v })} />
+        <Toggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void writeSettings({ danmaku: v })} />
+        <Toggle label="账号工具" checked={settings.accountTools} onChange={(v) => void writeSettings({ accountTools: v })} />
       </div>
 
-      <SectionTitle>操作</SectionTitle>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Button onClick={() => void browser.tabs.create({ url: 'https://www.bilibili.com/' })}>
+      {/* 操作 */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <Button style={{ flex: 1 }} onClick={() => void browser.tabs.create({ url: 'https://www.bilibili.com/' })}>
           打开 B 站
         </Button>
-        <Button onClick={() => void browser.runtime.openOptionsPage()}>
+        <Button style={{ flex: 1 }} onClick={() => void browser.runtime.openOptionsPage()}>
           详细设置
         </Button>
       </div>

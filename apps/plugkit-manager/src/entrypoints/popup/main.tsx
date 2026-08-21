@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
-import { Popup, Toggle, SectionTitle, Badge, Button } from '@plugkit/core/ui';
+import { Popup, Toggle, Badge, Button } from '@plugkit/core/ui';
 import { settingsStore, type HubSettings } from '../../shared/types';
 
 interface ManagedPlugin {
@@ -264,9 +264,8 @@ function App() {
         </>
       )}
 
-      <SectionTitle>提示</SectionTitle>
-      <p className="pk-stat-sub" style={{ margin: '4px 0 0' }}>
-        卸载不可逆；详细运行状态与日志见设置页。
+      <p className="pk-stat-sub" style={{ marginTop: 10, textAlign: 'center' }}>
+        卸载不可逆 · 详情见设置页
       </p>
     </Popup>
   );
