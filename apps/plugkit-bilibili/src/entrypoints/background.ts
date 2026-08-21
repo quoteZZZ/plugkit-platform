@@ -204,9 +204,16 @@ export default defineBackground(() => {
         await chrome.alarms.create(alarmName, { periodInMinutes: 24 * 60 }).catch(() => {});
       }
       logger.info('Bilibili 管理已初始化');
+      // 心跳：记录后台启动状态，供 popup 降级时诊断显示
+      await chrome.storage.local
+        .set({ 'plugkit:bili:heartbeat': { ts: Date.now(), ok: true } })
+        .catch(() => {});
     } catch (e) {
       // 初始化失败不应拖垮整个后台（否则 popup 消息将永久无响应，表现为"一直加载中"）
       recordError('初始化', e);
+      await chrome.storage.local
+        .set({ 'plugkit:bili:heartbeat': { ts: Date.now(), ok: false, err: String(e) } })
+        .catch(() => {});
     }
   })();
 

@@ -75,18 +75,22 @@ function App() {
     }
     // 2) 降级：后台消息通道不可达时，直读 storage 展示本地数据（UI 仍可用）
     try {
-      const raw = await chrome.storage.local.get(['plugkit:bili:settings', 'plugkit:bili:stats']);
+      const raw = await chrome.storage.local.get(['plugkit:bili:settings', 'plugkit:bili:stats', 'plugkit:bili:heartbeat']);
       const settings = { ...DEFAULT_SETTINGS, ...((raw['plugkit:bili:settings'] ?? {}) as Partial<BiliSettings>) };
       const stats = { ...DEFAULT_STATS, ...((raw['plugkit:bili:stats'] ?? {}) as Partial<BiliStats>) };
+      const hb = raw['plugkit:bili:heartbeat'] as { ts?: number; ok?: boolean; err?: string } | undefined;
       const todayEstimatedMB = Math.round(stats.todayPcdn * settings.avgChunkMB * 10) / 10;
       const totalEstimatedMB = Math.round(stats.totalPcdn * settings.avgChunkMB * 10) / 10;
+      const hbInfo = hb
+        ? `后台上次启动：${new Date(hb.ts ?? 0).toLocaleTimeString()}（${hb.ok ? '正常' : `失败${hb.err ? `：${hb.err}` : ''}`}）`
+        : '后台从未成功启动过（SW 可能未运行）。';
       setSnap({
         stats,
         settings,
         enabledRulesets: [],
         todayEstimatedMB,
         totalEstimatedMB,
-        bgErrors: ['后台消息通道不可达，已降级显示本地数据（拦截/签到需后台运行）。请到 chrome://extensions 刷新该插件。'],
+        bgErrors: [`后台消息通道不可达，已降级显示本地数据。${hbInfo}`],
       });
       setError('');
     } catch (e) {
@@ -119,8 +123,22 @@ function App() {
 
   const onCheckin = async () => {
     setCheckin('签到中…');
-    const r = await checkinChannel.send().catch(() => ({ ok: false, msg: '后台不可达，签到未执行。请刷新扩展后重试。' }));
-    setCheckin(r.msg);
+    // 优先后台（含 alarms 自动签到能力）；后台不可达时 popup 直接调 B 站接口
+    // （popup 具有 bilibili 域 host_permissions，credentials 带登录 cookie）
+    const r = await checkinChannel.send().catch(() => null);
+    if (r) {
+      setCheckin(r.msg);
+      return;
+    }
+    try {
+      const res = await fetch('https://api.bilibili.com/x/sign/doSign', { credentials: 'include' });
+      const json = (await res.json()) as { code: number; message?: string; data?: { text?: string } };
+      if (json.code === 0) setCheckin(json.data?.text ?? '签到成功');
+      else if (json.code === -101) setCheckin('未登录 B 站，签到失败');
+      else setCheckin(json.message ?? `签到失败(code=${json.code})`);
+    } catch {
+      setCheckin('签到失败：网络错误');
+    }
   };
 
   if (error) {
