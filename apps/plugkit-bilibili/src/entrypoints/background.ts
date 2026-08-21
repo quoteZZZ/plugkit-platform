@@ -210,6 +210,20 @@ export default defineBackground(() => {
     }
   })();
 
+  // 设置变更驱动：popup/options 即使消息通道异常也能通过「直写 storage」触发规则重算
+  // （storage.onChanged 是唯一可靠的事件桥，防抖 300ms 合并连续变更）
+  safeRegister('settingsWatch', () => {
+    let watchTimer: number | undefined;
+    settingsStore.watch((s) => {
+      settings = s;
+      if (watchTimer !== undefined) return;
+      watchTimer = setTimeout(() => {
+        watchTimer = undefined;
+        void applyRulesets();
+      }, 300) as unknown as number;
+    });
+  });
+
   // —— 1) PCDN 请求计数（observe 模式，非阻塞）——
   safeRegister('webRequest', () => {
     chrome.webRequest.onBeforeRequest.addListener(

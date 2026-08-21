@@ -6,9 +6,11 @@ import {
   StateSnapshot,
   getStateChannel,
   checkinChannel,
-  setMasterChannel,
   updateSettingsChannel,
   BiliSettings,
+  BiliStats,
+  DEFAULT_SETTINGS,
+  DEFAULT_STATS,
   DayStat,
 } from '../../shared/types';
 import { fmtBytes } from '../../shared/format';
@@ -53,34 +55,42 @@ function App() {
   const [checkin, setCheckin] = React.useState('');
 
   const reload = React.useCallback(async () => {
-    // SW 冷启动竞态：第一次 sendMessage 可能因后台唤醒未完成而 resolve undefined。
-    // 自动重试最多 3 次，显著提升冷启动成功率。
+    // 1) 先走消息通道（可携带后台诊断）
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        // 加超时兜底：后台 Service Worker 冷启动/异常时不让界面永久"加载中"
         const snap = await Promise.race([
           getStateChannel.send(),
           new Promise<never>((_, reject) =>
-            setTimeout(
-              () => reject(new Error('后台无响应（可能正在冷启动）。若持续出现，请到 chrome://extensions 刷新该插件后重试。')),
-              4000,
-            ),
+            setTimeout(() => reject(new Error('后台无响应')), 4000),
           ),
         ]);
-        // 后台异常时 sendMessage 可能 resolve undefined，须显式校验
-        if (!snap || !snap.settings || !snap.stats) {
-          throw new Error('后台返回异常，请稍候自动重试…');
-        }
+        if (!snap || !snap.settings || !snap.stats) throw new Error('空响应');
         setSnap(snap);
         setError('');
         return;
-      } catch (e) {
-        if (attempt === 2) {
-          setError(String(e));
-          return;
-        }
+      } catch {
+        if (attempt === 2) break;
         await new Promise((r) => setTimeout(r, 500));
       }
+    }
+    // 2) 降级：后台消息通道不可达时，直读 storage 展示本地数据（UI 仍可用）
+    try {
+      const raw = await chrome.storage.local.get(['plugkit:bili:settings', 'plugkit:bili:stats']);
+      const settings = { ...DEFAULT_SETTINGS, ...((raw['plugkit:bili:settings'] ?? {}) as Partial<BiliSettings>) };
+      const stats = { ...DEFAULT_STATS, ...((raw['plugkit:bili:stats'] ?? {}) as Partial<BiliStats>) };
+      const todayEstimatedMB = Math.round(stats.todayPcdn * settings.avgChunkMB * 10) / 10;
+      const totalEstimatedMB = Math.round(stats.totalPcdn * settings.avgChunkMB * 10) / 10;
+      setSnap({
+        stats,
+        settings,
+        enabledRulesets: [],
+        todayEstimatedMB,
+        totalEstimatedMB,
+        bgErrors: ['后台消息通道不可达，已降级显示本地数据（拦截/签到需后台运行）。请到 chrome://extensions 刷新该插件。'],
+      });
+      setError('');
+    } catch (e) {
+      setError(String(e));
     }
   }, []);
 
@@ -88,20 +98,28 @@ function App() {
     void reload();
   }, [reload]);
 
+  /** 直写设置到 storage + 尽力通知后台（后台有 storage.watch 兜底应用规则） */
+  const writeSettings = async (patch: Partial<BiliSettings>) => {
+    const raw = await chrome.storage.local.get('plugkit:bili:settings');
+    const cur = { ...DEFAULT_SETTINGS, ...((raw['plugkit:bili:settings'] ?? {}) as Partial<BiliSettings>) };
+    await chrome.storage.local.set({ 'plugkit:bili:settings': { ...cur, ...patch } });
+    await updateSettingsChannel.send({ patch }).catch(() => {});
+  };
+
   const onToggle = async (patch: Partial<BiliSettings>) => {
-    await updateSettingsChannel.send({ patch });
+    await writeSettings(patch);
     await reload();
   };
 
   const onToggleMaster = async (v: boolean) => {
-    // 总开关走专用通道，确保 DNR 规则集同步启停
-    await setMasterChannel.send({ on: v });
+    // 总开关走直写 + 通知，后台 watch 同步 DNR 规则集
+    await writeSettings({ masterOn: v });
     await reload();
   };
 
   const onCheckin = async () => {
     setCheckin('签到中…');
-    const r = await checkinChannel.send();
+    const r = await checkinChannel.send().catch(() => ({ ok: false, msg: '后台不可达，签到未执行。请刷新扩展后重试。' }));
     setCheckin(r.msg);
   };
 
@@ -157,6 +175,25 @@ function App() {
           {running ? '运行中' : '已停用'}
         </Badge>
       </div>
+
+      {snap.bgErrors && snap.bgErrors.length > 0 && (
+        <div
+          className="plugkit-card"
+          style={{
+            marginTop: 8,
+            background: 'var(--pk-danger-weak)',
+            borderColor: 'var(--pk-danger)',
+            padding: '8px 12px',
+          }}
+        >
+          <div className="pk-stat-label">后台提示</div>
+          {snap.bgErrors.map((msg, i) => (
+            <div key={i} className="pk-stat-sub" style={{ color: 'var(--pk-danger)', marginTop: 2 }}>
+              {msg}
+            </div>
+          ))}
+        </div>
+      )}
 
       <SectionTitle>拦截总开关</SectionTitle>
       <div className="plugkit-card" style={{ padding: '2px 14px' }}>

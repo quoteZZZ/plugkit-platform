@@ -7,6 +7,10 @@ import {
   updateSettingsChannel,
   resetStatsChannel,
   BiliSettings,
+  BiliStats,
+  DEFAULT_SETTINGS,
+  DEFAULT_STATS,
+  todayStr,
 } from '../../shared/types';
 import { fmtBytes } from '../../shared/format';
 
@@ -30,19 +34,16 @@ function App() {
   const [allowlistInput, setAllowlistInput] = React.useState('');
 
   const reload = React.useCallback(async () => {
-    // SW 冷启动竞态：自动重试最多 3 次，提升冷启动成功率
+    // 1) 先走消息通道
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const s = await Promise.race([
           getStateChannel.send(),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('后台无响应，请到 chrome://extensions 刷新该插件后重试。')), 4000),
+            setTimeout(() => reject(new Error('后台无响应')), 4000),
           ),
         ]);
-        // 后台异常时 sendMessage 可能 resolve undefined，须显式校验
-        if (!s || !s.settings || !s.stats) {
-          throw new Error('后台返回异常，请稍候自动重试…');
-        }
+        if (!s || !s.settings || !s.stats) throw new Error('空响应');
         setSnap(s);
         setError('');
         setChunkInput(String(s.settings.avgChunkMB));
@@ -50,13 +51,32 @@ function App() {
         setHotkeyInput(s.settings.danmakuHotkey);
         setAllowlistInput((s.settings.pcdnAllowlist ?? []).join(', '));
         return;
-      } catch (e) {
-        if (attempt === 2) {
-          setError(String(e));
-          return;
-        }
+      } catch {
+        if (attempt === 2) break;
         await new Promise((r) => setTimeout(r, 500));
       }
+    }
+    // 2) 降级：直读 storage 展示
+    try {
+      const raw = await chrome.storage.local.get(['plugkit:bili:settings', 'plugkit:bili:stats']);
+      const settings = { ...DEFAULT_SETTINGS, ...((raw['plugkit:bili:settings'] ?? {}) as Partial<BiliSettings>) };
+      const stats = { ...DEFAULT_STATS, ...((raw['plugkit:bili:stats'] ?? {}) as Partial<BiliStats>) };
+      const todayEstimatedMB = Math.round(stats.todayPcdn * settings.avgChunkMB * 10) / 10;
+      setSnap({
+        stats,
+        settings,
+        enabledRulesets: [],
+        todayEstimatedMB,
+        totalEstimatedMB: 0,
+        bgErrors: ['后台消息通道不可达，已降级显示本地数据（拦截/签到需后台运行）。请到 chrome://extensions 刷新该插件。'],
+      });
+      setError('');
+      setChunkInput(String(settings.avgChunkMB));
+      setSpeedInput(String(settings.customSpeed));
+      setHotkeyInput(settings.danmakuHotkey);
+      setAllowlistInput((settings.pcdnAllowlist ?? []).join(', '));
+    } catch (e) {
+      setError(String(e));
     }
   }, []);
 
@@ -64,13 +84,23 @@ function App() {
     void reload();
   }, [reload]);
 
+  /** 直写设置到 storage + 尽力通知后台（后台 storage.watch 兜底应用规则） */
+  const writeSettings = async (patch: Partial<BiliSettings>) => {
+    const raw = await chrome.storage.local.get('plugkit:bili:settings');
+    const cur = { ...DEFAULT_SETTINGS, ...((raw['plugkit:bili:settings'] ?? {}) as Partial<BiliSettings>) };
+    await chrome.storage.local.set({ 'plugkit:bili:settings': { ...cur, ...patch } });
+    await updateSettingsChannel.send({ patch }).catch(() => {});
+  };
+
   const onToggle = async (patch: Partial<BiliSettings>) => {
-    await updateSettingsChannel.send({ patch });
+    await writeSettings(patch);
     await reload();
   };
   const onReset = async () => {
     if (confirm('确定清零全部统计？')) {
-      await resetStatsChannel.send();
+      const raw = await chrome.storage.local.get('plugkit:bili:stats');
+      await chrome.storage.local.set({ 'plugkit:bili:stats': { ...DEFAULT_STATS, ...((raw['plugkit:bili:stats'] ?? {}) as Partial<BiliStats>), today: todayStr(), todayPcdn: 0, todayP2pCalls: 0, todayP2pBytes: 0, todayAdRemoved: 0, daily: [] } });
+      await resetStatsChannel.send().catch(() => {});
       await reload();
     }
   };
