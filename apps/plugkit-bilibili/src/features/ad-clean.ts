@@ -1,8 +1,11 @@
 // feature: 页面广告净化——移除 B 站页面中的广告/推广元素
 // 策略：MutationObserver 增量检查新增节点（选择器命中 + 文本关键词双重判断），
 // 另加低频选择器兜底扫描（SPA 切换页面）。误删防护：不碰播放器区域/视频。
-import { adBlockedChannel } from '../shared/types';
+// 统计上报：直写 chrome.storage.local（纯 storage 驱动，不走消息通道）
+import { DEFAULT_STATS, todayStr } from '../shared/types';
 import { elText } from './util';
+
+const STATS_KEY = 'plugkit:bili:stats';
 
 /** 已知广告/推广元素选择器（B 站改版可能失效，靠关键词兜底） */
 const AD_SELECTORS = [
@@ -18,12 +21,33 @@ const AD_PATTERNS = [/^广告/, /^推广/, /^赞助/, /^精选/];
 
 let pending = 0;
 
+async function persistAdCount(count: number): Promise<void> {
+  try {
+    const raw = await chrome.storage.local.get(STATS_KEY);
+    const stats = { ...DEFAULT_STATS, ...(raw[STATS_KEY] ?? {}) };
+    stats.todayAdRemoved += count;
+    stats.totalAdRemoved += count;
+    // 同步 daily 当天项
+    const today = todayStr();
+    const daily = (stats.daily ?? []).slice();
+    let last = daily[daily.length - 1];
+    if (!last || last.date !== today) {
+      last = { date: today, pcdn: 0, p2pBytes: 0, adRemoved: 0 };
+      daily.push(last);
+    }
+    last.adRemoved = stats.todayAdRemoved;
+    stats.daily = daily.slice(-7);
+    await chrome.storage.local.set({ [STATS_KEY]: stats });
+  } catch {
+    /* 统计写入失败不影响净化功能 */
+  }
+}
+
 function flush() {
   if (pending === 0) return;
   const count = pending;
   pending = 0;
-  // background 可能休眠/未就绪；统计丢失可接受，但需吞掉 rejection
-  void adBlockedChannel.send({ count }).catch(() => {});
+  void persistAdCount(count);
 }
 
 function remove(el: Element): boolean {

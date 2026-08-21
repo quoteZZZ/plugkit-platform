@@ -1,9 +1,8 @@
-// 后台 Service Worker：统计中枢 + 规则集开关 + 内容脚本上报汇聚 + 每日签到
-// 设计要点（性能）：
-//  - PCDN 拦截由浏览器内核 DNR 完成，后台零参与；
-//  - 后台仅做轻事：webRequest 观察计数、content 上报落库、规则集开关、alarms 签到。
-// 健壮性：所有事件监听器经 safeRegister 注册——单个注册失败不影响其他功能；
-//         捕获的异常记入 bgErrors 供 UI 展示，避免"后台无响应/加载中"黑盒。
+// 后台 Service Worker：规则集应用 + 自动签到 + webRequest 观察计数
+// 架构说明（纯 storage 驱动）：
+//  - popup/options/content 直读直写 chrome.storage.local，本后台通过 storage.onChanged 感知设置变更；
+//  - PCDN 拦截由浏览器内核 DNR 完成（rules_base 静态规则默认启用，即使后台休眠也生效）；
+//  - 本后台保留：DNR 规则集/白名单应用、每日自动签到(alarms)、webRequest 计数落库、跨插件日志桥。
 import { defineBackground } from 'wxt/utils/define-background';
 import {
   clearLogs,
@@ -14,24 +13,7 @@ import {
   PLUGKIT_CLEAR_LOGS_CHANNEL,
   PLUGKIT_STATUS_CHANNEL,
 } from '@plugkit/core';
-import {
-  BiliSettings,
-  BiliStats,
-  DEFAULT_SETTINGS,
-  DEFAULT_STATS,
-  CheckinResult,
-  p2pBlockedChannel,
-  adBlockedChannel,
-  getStateChannel,
-  setAggressiveChannel,
-  setMasterChannel,
-  setBlockP2pChannel,
-  resetStatsChannel,
-  setChunkChannel,
-  updateSettingsChannel,
-  checkinChannel,
-  todayStr,
-} from '../shared/types';
+import { BiliSettings, BiliStats, DEFAULT_SETTINGS, DEFAULT_STATS, todayStr } from '../shared/types';
 import { matchesPcdn, WEB_REQUEST_FILTER } from '../shared/rules';
 
 export default defineBackground(() => {
@@ -43,7 +25,7 @@ export default defineBackground(() => {
   let buf = 0;
   let settings: BiliSettings = { ...DEFAULT_SETTINGS };
 
-  // 后台自诊断：最近捕获的错误（最多 5 条），经 getState 返回给 UI
+  // 后台自诊断：最近捕获的错误（最多 5 条），写入 storage 供 UI 显示
   const bgErrors: string[] = [];
   function recordError(tag: string, e: unknown): void {
     const msg = `${tag}: ${String(e ?? 'unknown')}`;
@@ -176,15 +158,13 @@ export default defineBackground(() => {
   }
 
   /** 每日签到（保守版：仅签到接口，不动投币/分享） */
-  async function doCheckin(): Promise<CheckinResult> {
+  async function doCheckin(): Promise<{ ok: boolean; msg: string }> {
     try {
       const res = await fetch('https://api.bilibili.com/x/sign/doSign', {
         credentials: 'include',
       });
       const json = (await res.json()) as { code: number; message?: string; data?: { text?: string } };
-      if (json.code === 0) {
-        return { ok: true, msg: json.data?.text ?? '签到成功' };
-      }
+      if (json.code === 0) return { ok: true, msg: json.data?.text ?? '签到成功' };
       if (json.code === -101) return { ok: false, msg: '未登录 B 站，签到失败' };
       if (json.code === -111) return { ok: false, msg: '签到过于频繁或需刷新登录态' };
       return { ok: false, msg: json.message ?? `签到失败(code=${json.code})` };
@@ -204,12 +184,11 @@ export default defineBackground(() => {
         await chrome.alarms.create(alarmName, { periodInMinutes: 24 * 60 }).catch(() => {});
       }
       logger.info('Bilibili 管理已初始化');
-      // 心跳：记录后台启动状态，供 popup 降级时诊断显示
+      // 心跳：记录后台启动状态，供 popup 诊断显示
       await chrome.storage.local
         .set({ 'plugkit:bili:heartbeat': { ts: Date.now(), ok: true } })
         .catch(() => {});
     } catch (e) {
-      // 初始化失败不应拖垮整个后台（否则 popup 消息将永久无响应，表现为"一直加载中"）
       recordError('初始化', e);
       await chrome.storage.local
         .set({ 'plugkit:bili:heartbeat': { ts: Date.now(), ok: false, err: String(e) } })
@@ -217,7 +196,7 @@ export default defineBackground(() => {
     }
   })();
 
-  // 设置变更驱动：popup/options 即使消息通道异常也能通过「直写 storage」触发规则重算
+  // 设置变更驱动：popup/options/content 直写 storage 后，这里应用 DNR 规则集/白名单
   // （storage.onChanged 是唯一可靠的事件桥，防抖 300ms 合并连续变更）
   safeRegister('settingsWatch', () => {
     let watchTimer: number | undefined;
@@ -231,7 +210,7 @@ export default defineBackground(() => {
     });
   });
 
-  // —— 1) PCDN 请求计数（observe 模式，非阻塞）——
+  // —— PCDN 请求计数（observe 模式，非阻塞）——
   safeRegister('webRequest', () => {
     chrome.webRequest.onBeforeRequest.addListener(
       (detail) => {
@@ -249,7 +228,7 @@ export default defineBackground(() => {
   safeRegister('interval', () => setInterval(() => void flush(), 30_000));
   safeRegister('onSuspend', () => chrome.runtime.onSuspend?.addListener(() => void flush()));
 
-  // —— 2) alarms：每日签到 ——
+  // —— alarms：每日自动签到 ——
   safeRegister('alarms', () => {
     chrome.alarms.onAlarm.addListener((alarm) => {
       if (alarm.name === 'plugkit-bili-checkin') {
@@ -262,115 +241,7 @@ export default defineBackground(() => {
     });
   });
 
-  // —— 3) 消息通道 ——
-  safeRegister('p2pBlocked', () => {
-    p2pBlockedChannel.on(async (data) => {
-      try {
-        const stats = roll(await statsStore.get());
-        stats.todayP2pCalls += data.calls;
-        stats.totalP2pCalls += data.calls;
-        stats.todayP2pBytes += data.bytes;
-        stats.totalP2pBytes += data.bytes;
-        await statsStore.set(withDaily(stats));
-      } catch (e) {
-        recordError('p2pBlocked', e);
-      }
-    });
-  });
-
-  safeRegister('adBlocked', () => {
-    adBlockedChannel.on(async ({ count }) => {
-      try {
-        const stats = roll(await statsStore.get());
-        stats.todayAdRemoved += count;
-        stats.totalAdRemoved += count;
-        await statsStore.set(withDaily(stats));
-      } catch (e) {
-        recordError('adBlocked', e);
-      }
-    });
-  });
-
-  safeRegister('getState', () => {
-    getStateChannel.on(async () => {
-      // 全链路兜底：任何一步失败都返回安全快照 + 诊断，避免 sendMessage resolve undefined
-      try {
-        await flush().catch(() => {});
-        const stats = await statsStore.get().catch(() => ({ ...DEFAULT_STATS }));
-        const s = await settingsStore.get().catch(() => ({ ...DEFAULT_SETTINGS }));
-        const rulesets = await chrome.declarativeNetRequest.getEnabledRulesets().catch(() => []);
-        const todayEstimatedMB = Math.round(stats.todayPcdn * s.avgChunkMB * 10) / 10;
-        const totalEstimatedMB = Math.round(stats.totalPcdn * s.avgChunkMB * 10) / 10;
-        return {
-          stats,
-          settings: s,
-          enabledRulesets: rulesets,
-          todayEstimatedMB,
-          totalEstimatedMB,
-          bgErrors: bgErrors.slice(),
-        };
-      } catch (e) {
-        recordError('getState', e);
-        return {
-          stats: { ...DEFAULT_STATS },
-          settings: { ...DEFAULT_SETTINGS },
-          enabledRulesets: [],
-          todayEstimatedMB: 0,
-          totalEstimatedMB: 0,
-          bgErrors: bgErrors.slice(),
-        };
-      }
-    });
-  });
-
-  safeRegister('setAggressive', () => {
-    setAggressiveChannel.on(async ({ on }) => {
-      await settingsStore.set({ aggressive: on });
-      await applyRulesets();
-    });
-  });
-
-  safeRegister('setMaster', () => {
-    setMasterChannel.on(async ({ on }) => {
-      await settingsStore.set({ masterOn: on });
-      await applyRulesets();
-    });
-  });
-
-  safeRegister('setBlockP2p', () => {
-    setBlockP2pChannel.on(async ({ on }) => {
-      await settingsStore.set({ blockP2p: on });
-    });
-  });
-
-  safeRegister('resetStats', () => {
-    resetStatsChannel.on(async () => {
-      buf = 0;
-      await statsStore.set(withDaily({ ...DEFAULT_STATS, today: todayStr() }));
-    });
-  });
-
-  safeRegister('setChunk', () => {
-    setChunkChannel.on(async ({ mb }) => {
-      const v = Math.max(0.5, Math.min(20, mb));
-      await settingsStore.set({ avgChunkMB: v });
-    });
-  });
-
-  safeRegister('updateSettings', () => {
-    updateSettingsChannel.on(async ({ patch }) => {
-      await settingsStore.set(patch);
-      if ('masterOn' in patch || 'aggressive' in patch || 'pcdnAllowlist' in patch) {
-        await applyRulesets();
-      }
-    });
-  });
-
-  safeRegister('checkin', () => {
-    checkinChannel.on(async () => doCheckin());
-  });
-
-  // —— 4) 跨插件状态桥：供 plugkit-manager 拉取本插件日志 ——
+  // —— 跨插件状态桥：供 plugkit-manager 拉取本插件日志（保留跨插件消息，管理平台依赖）——
   safeRegister('externalStatus', () => {
     onExternalMessage(PLUGKIT_STATUS_CHANNEL, async () => {
       try {

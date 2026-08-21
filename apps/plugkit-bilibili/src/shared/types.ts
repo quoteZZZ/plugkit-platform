@@ -1,6 +1,6 @@
-// 插件共享类型：统计结构 + 设置结构 + 消息通道定义
+// 插件共享类型：统计结构 + 设置结构
 // 所有端（background/content/popup/options）从同一处 import，保证类型一致
-import { defineChannel } from '@plugkit/core';
+// 说明：已改为纯 storage 驱动（chrome.storage.local 直读直写），不再使用消息通道
 
 /** 单日拦截统计（近 7 天趋势用） */
 export type DayStat = {
@@ -149,39 +149,3 @@ export interface CheckinResult {
   ok: boolean;
   msg: string;
 }
-
-// —— 消息通道（类型化，复用 @plugkit/core messaging）——
-
-/** content → background：上报阻止的 WebRTC 上传（content 端已聚合，低频） */
-export const p2pBlockedChannel = defineChannel<{ bytes: number; calls: number }, void>(
-  'bili/p2pBlocked',
-);
-
-/** content → background：上报清理的广告数 */
-export const adBlockedChannel = defineChannel<{ count: number }, void>('bili/adBlocked');
-
-/** popup/options → background：读取状态快照 */
-export const getStateChannel = defineChannel<void, StateSnapshot>('bili/getState');
-
-/** options → background：切换激进档 */
-export const setAggressiveChannel = defineChannel<{ on: boolean }, void>('bili/setAggressive');
-
-/** popup/options → background：总开关（PCDN 拦截） */
-export const setMasterChannel = defineChannel<{ on: boolean }, void>('bili/setMaster');
-
-/** options → background：阻止直播上传开关 */
-export const setBlockP2pChannel = defineChannel<{ on: boolean }, void>('bili/setBlockP2p');
-
-/** options → background：清零统计 */
-export const resetStatsChannel = defineChannel<void, void>('bili/resetStats');
-
-/** options → background：设置估算分片大小 */
-export const setChunkChannel = defineChannel<{ mb: number }, void>('bili/setChunk');
-
-/** popup/options → background：通用设置更新（功能开关/参数） */
-export const updateSettingsChannel = defineChannel<{ patch: Partial<BiliSettings> }, void>(
-  'bili/updateSettings',
-);
-
-/** popup → background：立即执行每日签到 */
-export const checkinChannel = defineChannel<void, CheckinResult>('bili/checkin');

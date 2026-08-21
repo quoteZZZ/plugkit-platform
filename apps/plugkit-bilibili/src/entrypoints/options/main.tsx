@@ -2,10 +2,6 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { OptionsPage, Field, Toggle, SectionTitle, Button } from '@plugkit/core/ui';
 import {
-  StateSnapshot,
-  getStateChannel,
-  updateSettingsChannel,
-  resetStatsChannel,
   BiliSettings,
   BiliStats,
   DEFAULT_SETTINGS,
@@ -13,6 +9,9 @@ import {
   todayStr,
 } from '../../shared/types';
 import { fmtBytes } from '../../shared/format';
+
+const SETTINGS_KEY = 'plugkit:bili:settings';
+const STATS_KEY = 'plugkit:bili:stats';
 
 function Group(props: { title: string; children: React.ReactNode }) {
   return (
@@ -26,82 +25,60 @@ function Group(props: { title: string; children: React.ReactNode }) {
 }
 
 function App() {
-  const [snap, setSnap] = React.useState<StateSnapshot | null>(null);
+  const [data, setData] = React.useState<{ stats: BiliStats; settings: BiliSettings } | null>(null);
   const [error, setError] = React.useState('');
   const [chunkInput, setChunkInput] = React.useState('2');
   const [speedInput, setSpeedInput] = React.useState('1');
   const [hotkeyInput, setHotkeyInput] = React.useState('Alt+D');
   const [allowlistInput, setAllowlistInput] = React.useState('');
 
-  const reload = React.useCallback(async () => {
-    // 1) 先走消息通道
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        const s = await Promise.race([
-          getStateChannel.send(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('后台无响应')), 4000),
-          ),
-        ]);
-        if (!s || !s.settings || !s.stats) throw new Error('空响应');
-        setSnap(s);
-        setError('');
-        setChunkInput(String(s.settings.avgChunkMB));
-        setSpeedInput(String(s.settings.customSpeed));
-        setHotkeyInput(s.settings.danmakuHotkey);
-        setAllowlistInput((s.settings.pcdnAllowlist ?? []).join(', '));
-        return;
-      } catch {
-        if (attempt === 2) break;
-        await new Promise((r) => setTimeout(r, 500));
-      }
-    }
-    // 2) 降级：直读 storage 展示
+  // init=true 时初始化输入框 state；false 仅刷新数据（避免覆盖用户正在编辑的输入）
+  const reload = React.useCallback(async (init = false) => {
     try {
-      const raw = await chrome.storage.local.get(['plugkit:bili:settings', 'plugkit:bili:stats']);
-      const settings = { ...DEFAULT_SETTINGS, ...((raw['plugkit:bili:settings'] ?? {}) as Partial<BiliSettings>) };
-      const stats = { ...DEFAULT_STATS, ...((raw['plugkit:bili:stats'] ?? {}) as Partial<BiliStats>) };
-      const todayEstimatedMB = Math.round(stats.todayPcdn * settings.avgChunkMB * 10) / 10;
-      setSnap({
-        stats,
-        settings,
-        enabledRulesets: [],
-        todayEstimatedMB,
-        totalEstimatedMB: 0,
-        bgErrors: ['后台消息通道不可达，已降级显示本地数据（拦截/签到需后台运行）。请到 chrome://extensions 刷新该插件。'],
-      });
+      const raw = await chrome.storage.local.get([SETTINGS_KEY, STATS_KEY]);
+      const settings = { ...DEFAULT_SETTINGS, ...((raw[SETTINGS_KEY] ?? {}) as Partial<BiliSettings>) };
+      const stats = { ...DEFAULT_STATS, ...((raw[STATS_KEY] ?? {}) as Partial<BiliStats>) };
+      setData({ stats, settings });
       setError('');
-      setChunkInput(String(settings.avgChunkMB));
-      setSpeedInput(String(settings.customSpeed));
-      setHotkeyInput(settings.danmakuHotkey);
-      setAllowlistInput((settings.pcdnAllowlist ?? []).join(', '));
+      if (init) {
+        setChunkInput(String(settings.avgChunkMB));
+        setSpeedInput(String(settings.customSpeed));
+        setHotkeyInput(settings.danmakuHotkey);
+        setAllowlistInput((settings.pcdnAllowlist ?? []).join(', '));
+      }
     } catch (e) {
       setError(String(e));
     }
   }, []);
 
   React.useEffect(() => {
-    void reload();
+    void reload(true);
   }, [reload]);
 
-  /** 直写设置到 storage + 尽力通知后台（后台 storage.watch 兜底应用规则） */
+  // 实时刷新：settings/stats 变化自动重新加载（content 上报 / 其他页面修改）
+  React.useEffect(() => {
+    const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'local' && (changes[SETTINGS_KEY] || changes[STATS_KEY])) {
+        void reload(false);
+      }
+    };
+    chrome.storage.onChanged.addListener(onChanged);
+    return () => chrome.storage.onChanged.removeListener(onChanged);
+  }, [reload]);
+
+  /** 直写设置（storage.onChanged 驱动后台规则应用） */
   const writeSettings = async (patch: Partial<BiliSettings>) => {
-    const raw = await chrome.storage.local.get('plugkit:bili:settings');
-    const cur = { ...DEFAULT_SETTINGS, ...((raw['plugkit:bili:settings'] ?? {}) as Partial<BiliSettings>) };
-    await chrome.storage.local.set({ 'plugkit:bili:settings': { ...cur, ...patch } });
-    await updateSettingsChannel.send({ patch }).catch(() => {});
+    const raw = await chrome.storage.local.get(SETTINGS_KEY);
+    const cur = { ...DEFAULT_SETTINGS, ...((raw[SETTINGS_KEY] ?? {}) as Partial<BiliSettings>) };
+    await chrome.storage.local.set({ [SETTINGS_KEY]: { ...cur, ...patch } });
   };
 
   const onToggle = async (patch: Partial<BiliSettings>) => {
     await writeSettings(patch);
-    await reload();
   };
   const onReset = async () => {
     if (confirm('确定清零全部统计？')) {
-      const raw = await chrome.storage.local.get('plugkit:bili:stats');
-      await chrome.storage.local.set({ 'plugkit:bili:stats': { ...DEFAULT_STATS, ...((raw['plugkit:bili:stats'] ?? {}) as Partial<BiliStats>), today: todayStr(), todayPcdn: 0, todayP2pCalls: 0, todayP2pBytes: 0, todayAdRemoved: 0, daily: [] } });
-      await resetStatsChannel.send().catch(() => {});
-      await reload();
+      await chrome.storage.local.set({ [STATS_KEY]: { ...DEFAULT_STATS, today: todayStr() } });
     }
   };
   const onChunk = async () => {
@@ -126,7 +103,7 @@ function App() {
     await onToggle({ pcdnAllowlist: domains });
   };
 
-  if (!snap) {
+  if (!data) {
     return (
       <OptionsPage title="B站管理 · 设置">
         {error ? (
@@ -134,16 +111,15 @@ function App() {
             <div className="pk-stat-label">错误</div>
             <div className="pk-stat-value" style={{ fontSize: 14 }}>{error}</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-              <Button variant="primary" onClick={() => void reload()}>
+              <Button variant="primary" onClick={() => void reload(true)}>
                 重试
               </Button>
               <Button
                 variant="danger"
                 onClick={async () => {
-                  // 旧版本/损坏的 storage 数据可致后台异常，重置后重试
-                  await chrome.storage.local.remove(['plugkit:bili:settings', 'plugkit:bili:stats']);
+                  await chrome.storage.local.remove([SETTINGS_KEY, STATS_KEY]);
                   setError('');
-                  await reload();
+                  await reload(true);
                 }}
               >
                 重置插件数据
@@ -159,7 +135,7 @@ function App() {
       </OptionsPage>
     );
   }
-  const { stats, settings } = snap;
+  const { stats, settings } = data;
 
   return (
     <OptionsPage title="B站管理 · 设置">
