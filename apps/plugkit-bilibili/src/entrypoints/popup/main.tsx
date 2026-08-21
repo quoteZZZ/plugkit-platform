@@ -193,19 +193,19 @@ function App() {
 
       {bgErrors.length > 0 && (
         <div
-          className="plugkit-card"
           style={{
             marginTop: 8,
+            padding: '6px 10px',
+            borderRadius: 8,
             background: 'var(--pk-danger-weak)',
-            borderColor: 'var(--pk-danger)',
-            padding: '8px 12px',
+            border: '1px solid var(--pk-danger)',
+            color: 'var(--pk-danger)',
+            fontSize: 11,
+            lineHeight: 1.5,
           }}
         >
-          <div className="pk-stat-label">后台提示</div>
           {bgErrors.map((msg, i) => (
-            <div key={i} className="pk-stat-sub" style={{ color: 'var(--pk-danger)', marginTop: 2 }}>
-              {msg}
-            </div>
+            <div key={i}>{msg}</div>
           ))}
         </div>
       )}

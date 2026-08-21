@@ -266,8 +266,7 @@ function App() {
 
       <SectionTitle>提示</SectionTitle>
       <p className="pk-stat-sub" style={{ margin: '4px 0 0' }}>
-        卸载不可逆；被禁用的插件功能会立即失效。本插件（插件平台）仅显示状态，不提供开关/卸载。
-        运行状态与日志请到设置页查看。
+        卸载不可逆；详细运行状态与日志见设置页。
       </p>
     </Popup>
   );

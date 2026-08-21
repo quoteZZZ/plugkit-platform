@@ -203,6 +203,7 @@ function App() {
         <Toggle label="记忆播放进度" checked={settings.rememberProgress} onChange={(v) => onToggle({ rememberProgress: v })} />
         <Toggle label="自动播放（可能被浏览器策略拦截）" checked={settings.autoPlay} onChange={(v) => onToggle({ autoPlay: v })} />
         <Toggle label="显示视频清晰度/编码" checked={settings.showVideoInfo} onChange={(v) => onToggle({ showVideoInfo: v })} />
+        <Toggle label="精确统计：播放/点赞等显示具体数字（替代「1.2万」模糊值）" checked={settings.preciseStats} onChange={(v) => onToggle({ preciseStats: v })} />
       </Group>
 
       <Group title="💬 弹幕管理">

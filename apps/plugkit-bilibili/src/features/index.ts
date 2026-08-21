@@ -6,6 +6,7 @@ import { startAdClean } from './ad-clean';
 import { startPlayerEnhance } from './player-enhance';
 import { startDanmaku } from './danmaku';
 import { startAccountTools } from './account';
+import { startPreciseStats } from './precise-stats';
 
 export async function loadFeatures(): Promise<void> {
   const s = await settingsStore.get();
@@ -13,6 +14,7 @@ export async function loadFeatures(): Promise<void> {
   if (s.playerEnhance) startPlayerEnhance(s);
   if (s.danmaku) startDanmaku(s);
   if (s.accountTools) startAccountTools(s);
+  if (s.preciseStats) startPreciseStats();
 }
 
 export type { BiliSettings };

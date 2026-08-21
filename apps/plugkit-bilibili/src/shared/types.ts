@@ -65,6 +65,8 @@ export type BiliSettings = {
   rememberProgress: boolean;
   /** 自动播放 */
   autoPlay: boolean;
+  /** 播放页把模糊统计（1.2万播放等）替换为精确值 */
+  preciseStats: boolean;
   /** 播放页显示清晰度/编码信息 */
   showVideoInfo: boolean;
   // —— 弹幕管理 ——
@@ -107,6 +109,7 @@ export const DEFAULT_SETTINGS: BiliSettings = {
   autoWidescreen: true,
   rememberProgress: true,
   autoPlay: false,
+  preciseStats: true,
   showVideoInfo: true,
   danmaku: true,
   danmakuHotkey: 'Alt+D',

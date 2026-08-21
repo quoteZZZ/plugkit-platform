@@ -242,13 +242,8 @@ function App() {
       </Group>
 
       <Group title="📖 说明">
-        <Field label="识别规则">
-          只有 manifest 含 <code>plugkit.suite = "plugkit"</code>（或名称以 PlugKit 开头）的扩展会被列出。
-        </Field>
-        <Field label="自身管理">
-          管理平台自身不提供启用/卸载入口（无法自管理）；本页面即其配置页。
-        </Field>
-        <Field label="所需权限">management（读取与开关扩展）、storage。</Field>
+        <Field label="识别">仅 manifest 含 <code>plugkit.suite</code>（或名称以 PlugKit 开头）的插件会被列出。</Field>
+        <Field label="权限">management（读/开关扩展）、storage。</Field>
       </Group>
     </OptionsPage>
   );
