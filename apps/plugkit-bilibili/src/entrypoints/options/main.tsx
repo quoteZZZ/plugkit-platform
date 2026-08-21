@@ -26,6 +26,7 @@ function App() {
   const [error, setError] = React.useState('');
   const [chunkInput, setChunkInput] = React.useState('2');
   const [speedInput, setSpeedInput] = React.useState('1');
+  const [hotkeyInput, setHotkeyInput] = React.useState('Alt+D');
 
   const reload = React.useCallback(async () => {
     try {
@@ -39,6 +40,7 @@ function App() {
       setError('');
       setChunkInput(String(s.settings.avgChunkMB));
       setSpeedInput(String(s.settings.customSpeed));
+      setHotkeyInput(s.settings.danmakuHotkey);
     } catch (e) {
       setError(String(e));
     }
@@ -66,6 +68,10 @@ function App() {
     const v = parseFloat(speedInput);
     if (Number.isFinite(v) && v >= 0.1 && v <= 16) await onToggle({ customSpeed: v });
     else alert('倍速需在 0.1 – 16 之间');
+  };
+  const onHotkey = async () => {
+    const v = hotkeyInput.trim();
+    if (v) await onToggle({ danmakuHotkey: v });
   };
 
   if (!snap) {
@@ -148,7 +154,21 @@ function App() {
       </Group>
 
       <Group title="💬 弹幕管理">
-        <Toggle label="弹幕管理（Alt+D 一键开关）" checked={settings.danmaku} onChange={(v) => onToggle({ danmaku: v })} />
+        <Toggle label="弹幕管理（快捷键一键开关）" checked={settings.danmaku} onChange={(v) => onToggle({ danmaku: v })} />
+        <Field label="弹幕快捷键">
+          <input
+            className="plugkit-input"
+            value={hotkeyInput}
+            onChange={(e) => setHotkeyInput(e.target.value)}
+            onBlur={() => void onHotkey()}
+            style={{ width: 130 }}
+            placeholder="Alt+D"
+          />
+          <button className="plugkit-btn" onClick={() => void onHotkey()} style={{ marginLeft: 8 }}>
+            保存
+          </button>
+          <span className="pk-stat-sub">格式：Ctrl/Alt/Shift+按键，失焦或保存生效</span>
+        </Field>
         <Field label="弹幕透明度">
           <input
             type="range"

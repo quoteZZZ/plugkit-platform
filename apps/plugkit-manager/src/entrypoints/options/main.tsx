@@ -88,6 +88,16 @@ function App() {
     if (logTarget && settings.logMonitor) void refreshLogs(logTarget);
   }, [logTarget, settings.logMonitor, refreshLogs]);
 
+  // 实时日志轮询自动刷新（与 popup 一致，按刷新间隔持续拉取）
+  React.useEffect(() => {
+    if (!logTarget || !settings.logMonitor) return;
+    const t = setInterval(
+      () => void refreshLogs(logTarget),
+      Math.max(2, settings.refreshSeconds) * 1000,
+    );
+    return () => clearInterval(t);
+  }, [logTarget, settings.logMonitor, settings.refreshSeconds, refreshLogs]);
+
   const onRefreshSeconds = async () => {
     const v = parseInt(refreshInput, 10);
     if (Number.isFinite(v) && v >= 2) await update({ refreshSeconds: v });

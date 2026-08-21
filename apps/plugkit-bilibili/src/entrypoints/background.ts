@@ -41,20 +41,50 @@ export default defineBackground(() => {
   let buf = 0;
   let settings: BiliSettings = { ...DEFAULT_SETTINGS };
 
-  /** 滚动今日统计（跨天自动归零今日项，累计保留） */
+  /** 确保 daily 含当天项并与 today* 同步；截断为最近 7 天 */
+  function withDaily(stats: BiliStats): BiliStats {
+    const t = stats.today;
+    const daily = (stats.daily ?? []).slice();
+    let last = daily[daily.length - 1];
+    if (!last || last.date !== t) {
+      last = { date: t, pcdn: 0, p2pBytes: 0, adRemoved: 0 };
+      daily.push(last);
+    } else {
+      last = { ...last };
+      daily[daily.length - 1] = last;
+    }
+    last.pcdn = stats.todayPcdn;
+    last.p2pBytes = stats.todayP2pBytes;
+    last.adRemoved = stats.todayAdRemoved;
+    return { ...stats, daily: daily.slice(-7) };
+  }
+
+  /** 滚动今日统计（跨天自动归零今日项，累计保留；跨天先把昨日数据落入 daily） */
   function roll(stats: BiliStats): BiliStats {
-    if (stats.today === todayStr()) return stats;
-    return {
+    const today = todayStr();
+    if (stats.today === today) return withDaily(stats);
+    const daily = (stats.daily ?? []).slice();
+    const yesterday = {
+      date: stats.today,
+      pcdn: stats.todayPcdn,
+      p2pBytes: stats.todayP2pBytes,
+      adRemoved: stats.todayAdRemoved,
+    };
+    const last = daily[daily.length - 1];
+    if (last && last.date === stats.today) daily[daily.length - 1] = yesterday;
+    else daily.push(yesterday);
+    return withDaily({
       ...DEFAULT_STATS,
-      today: todayStr(),
+      today,
       totalPcdn: stats.totalPcdn,
       totalP2pCalls: stats.totalP2pCalls,
       totalP2pBytes: stats.totalP2pBytes,
       totalAdRemoved: stats.totalAdRemoved,
-    };
+      daily,
+    });
   }
 
-  /** 把内存计数落库 */
+  /** 把内存计数落库（daily 与今日项同步） */
   async function flush() {
     const stats = roll(await statsStore.get());
     if (buf > 0) {
@@ -62,7 +92,7 @@ export default defineBackground(() => {
       stats.totalPcdn += buf;
       buf = 0;
     }
-    await statsStore.set(stats);
+    await statsStore.set(withDaily(stats));
   }
 
   /** 应用规则集启用状态（storage 为准，幂等） */
@@ -155,14 +185,14 @@ export default defineBackground(() => {
     stats.totalP2pCalls += data.calls;
     stats.todayP2pBytes += data.bytes;
     stats.totalP2pBytes += data.bytes;
-    await statsStore.set(stats);
+    await statsStore.set(withDaily(stats));
   });
 
   adBlockedChannel.on(async ({ count }) => {
     const stats = roll(await statsStore.get());
     stats.todayAdRemoved += count;
     stats.totalAdRemoved += count;
-    await statsStore.set(stats);
+    await statsStore.set(withDaily(stats));
   });
 
   getStateChannel.on(async () => {
@@ -191,7 +221,7 @@ export default defineBackground(() => {
 
   resetStatsChannel.on(async () => {
     buf = 0;
-    await statsStore.set({ ...DEFAULT_STATS, today: todayStr() });
+    await statsStore.set(withDaily({ ...DEFAULT_STATS, today: todayStr() }));
   });
 
   setChunkChannel.on(async ({ mb }) => {

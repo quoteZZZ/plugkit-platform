@@ -71,7 +71,8 @@ export function LogPanel(props: {
           </div>
         ) : (
           visible.map((e, i) => (
-            <div className="plugkit-log-row" key={i}>
+            // key 用 ts+ns+level 组合（附序号兜底），避免纯 index 在新日志插入时整列重排
+            <div className="plugkit-log-row" key={`${e.ts}-${e.ns}-${e.level}-${i}`}>
               <span className="plugkit-log-time">{fmtTime(e.ts)}</span>
               <span className="plugkit-log-level" style={{ color: LEVEL_COLOR[e.level] }}>
                 {e.level}

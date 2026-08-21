@@ -9,8 +9,43 @@ import {
   setMasterChannel,
   updateSettingsChannel,
   BiliSettings,
+  DayStat,
 } from '../../shared/types';
 import { fmtBytes } from '../../shared/format';
+
+/** 近 7 天 PCDN 拦截迷你柱状图 */
+function TrendChart({ daily }: { daily: DayStat[] }) {
+  const max = Math.max(...daily.map((d) => d.pcdn), 1);
+  return (
+    <div className="plugkit-card pk-stat">
+      <div className="pk-stat-label">近7天拦截趋势（PCDN 次数）</div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 56, marginTop: 10 }}>
+        {daily.map((d) => {
+          const ratio = d.pcdn / max;
+          const h = Math.max(4, Math.round(ratio * 46));
+          return (
+            <div
+              key={d.date}
+              style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}
+            >
+              <div
+                title={`${d.date}: ${d.pcdn} 次`}
+                style={{
+                  width: '100%',
+                  borderRadius: 3,
+                  background: 'var(--pk-accent)',
+                  opacity: 0.4 + 0.6 * ratio,
+                  height: h,
+                }}
+              />
+              <span style={{ fontSize: 10, color: 'var(--pk-text-muted)' }}>{d.date.slice(5)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function App() {
   const [snap, setSnap] = React.useState<StateSnapshot | null>(null);
@@ -128,6 +163,8 @@ function App() {
         value={String(stats.todayAdRemoved)}
         sub={`累计 ${stats.totalAdRemoved} 个元素`}
       />
+
+      {stats.daily.length > 0 && <TrendChart daily={stats.daily} />}
 
       <SectionTitle>功能开关</SectionTitle>
       <div className="plugkit-card" style={{ padding: '4px 14px' }}>

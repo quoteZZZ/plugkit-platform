@@ -2,6 +2,18 @@
 // 所有端（background/content/popup/options）从同一处 import，保证类型一致
 import { defineChannel } from '@plugkit/core';
 
+/** 单日拦截统计（近 7 天趋势用） */
+export type DayStat = {
+  /** 日期 yyyy-mm-dd */
+  date: string;
+  /** 当日 PCDN 拦截请求数 */
+  pcdn: number;
+  /** 当日阻止上传字节数 */
+  p2pBytes: number;
+  /** 当日清理广告元素数 */
+  adRemoved: number;
+};
+
 /** 拦截统计（持久化于 chrome.storage.local） */
 export type BiliStats = {
   /** 今日日期 yyyy-mm-dd（跨天自动滚动） */
@@ -22,6 +34,8 @@ export type BiliStats = {
   totalP2pBytes: number;
   /** 累计清理广告元素数 */
   totalAdRemoved: number;
+  /** 近 7 天每日统计（末项为今天，随 today* 实时同步） */
+  daily: DayStat[];
 };
 
 /** 插件设置（持久化于 chrome.storage.local） */
@@ -52,6 +66,8 @@ export type BiliSettings = {
   // —— 弹幕管理 ——
   /** 弹幕管理总开关（快捷键/透明度） */
   danmaku: boolean;
+  /** 弹幕快捷键（格式：Ctrl/Alt/Shift+按键，如 Alt+D） */
+  danmakuHotkey: string;
   /** 弹幕透明度（10-100，100 为原样） */
   danmakuOpacity: number;
   // —— 账号工具 ——
@@ -85,6 +101,7 @@ export const DEFAULT_SETTINGS: BiliSettings = {
   rememberProgress: true,
   autoPlay: false,
   danmaku: true,
+  danmakuHotkey: 'Alt+D',
   danmakuOpacity: 100,
   accountTools: true,
   autoCheckin: true,
@@ -102,6 +119,7 @@ export const DEFAULT_STATS: BiliStats = {
   totalP2pCalls: 0,
   totalP2pBytes: 0,
   totalAdRemoved: 0,
+  daily: [],
 };
 
 /** 状态快照：popup / options 读取用 */
