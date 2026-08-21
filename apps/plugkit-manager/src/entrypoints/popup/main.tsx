@@ -2,10 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
 import { Popup, Toggle, SectionTitle, Badge, Button } from '@plugkit/core/ui';
-import type { LogLevel } from '@plugkit/core';
-import { LogPanel } from '../../components/LogPanel';
 import { settingsStore, type HubSettings } from '../../shared/types';
-import { fetchLogs, clearLogsFor } from '../../shared/hub';
 
 interface ManagedPlugin {
   id: string;
@@ -126,16 +123,10 @@ function PluginRow(props: {
 
 function App() {
   const selfId = browser.runtime.id;
-  const [tab, setTab] = React.useState<'plugins' | 'logs'>('plugins');
   const [plugins, setPlugins] = React.useState<ManagedPlugin[]>([]);
   const [settings, setSettings] = React.useState<HubSettings>(settingsStore.defaults);
   const [keyword, setKeyword] = React.useState('');
   const [error, setError] = React.useState('');
-
-  // —— 日志 tab 状态 ——
-  const [logTarget, setLogTarget] = React.useState<string>('');
-  const [logs, setLogs] = React.useState<import('@plugkit/core').LogEntry[]>([]);
-  const [logsLoading, setLogsLoading] = React.useState(false);
 
   const reload = React.useCallback(async () => {
     try {
@@ -189,41 +180,6 @@ function App() {
     return () => clearInterval(t);
   }, [settings.autoRefresh, settings.refreshSeconds, reload]);
 
-  const refreshLogs = React.useCallback(
-    async (targetId: string) => {
-      if (!targetId) return;
-      setLogsLoading(true);
-      try {
-        const list = await fetchLogs(targetId, selfId);
-        setLogs(list.slice(-settings.maxLogs));
-      } finally {
-        setLogsLoading(false);
-      }
-    },
-    [selfId, settings.maxLogs],
-  );
-
-  const clearLogsTarget = React.useCallback(async () => {
-    if (!logTarget) return;
-    await clearLogsFor(logTarget, selfId);
-    await refreshLogs(logTarget);
-  }, [logTarget, selfId, refreshLogs]);
-
-  // 切换日志目标时自动拉取
-  React.useEffect(() => {
-    if (tab === 'logs' && logTarget) void refreshLogs(logTarget);
-  }, [tab, logTarget, refreshLogs]);
-
-  // 日志 tab 轮询自动刷新：按自动刷新间隔持续拉取最新日志
-  React.useEffect(() => {
-    if (tab !== 'logs' || !logTarget || !settings.logMonitor) return;
-    const t = setInterval(
-      () => void refreshLogs(logTarget),
-      Math.max(2, settings.refreshSeconds) * 1000,
-    );
-    return () => clearInterval(t);
-  }, [tab, logTarget, settings.logMonitor, settings.refreshSeconds, refreshLogs]);
-
   const onToggle = async (p: ManagedPlugin, enabled: boolean) => {
     await browser.management.setEnabled(p.id, enabled);
     reload();
@@ -253,10 +209,6 @@ function App() {
   });
   const enabledCount = plugins.filter((p) => p.enabled).length;
 
-  // 日志 tab 的插件选择器目标列表
-  const logTargets = plugins.filter((p) => (settings.showSelf ? true : !p.isSelf));
-  const selectedLogTarget = logTarget || logTargets[0]?.id || '';
-
   return (
     <Popup>
       <div className="plugkit-popup-header">
@@ -267,29 +219,6 @@ function App() {
         </Badge>
       </div>
 
-      {/* 标签切换 */}
-      <div style={{ display: 'flex', gap: 4, margin: '10px 0 0', borderBottom: '1px solid #eaeef2' }}>
-        {(['plugins', 'logs'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              flex: 1,
-              padding: '7px 0',
-              fontSize: 13,
-              fontWeight: tab === t ? 700 : 400,
-              color: tab === t ? '#1f6feb' : '#57606a',
-              background: 'transparent',
-              border: 'none',
-              borderBottom: tab === t ? '2px solid #1f6feb' : '2px solid transparent',
-              cursor: 'pointer',
-            }}
-          >
-            {t === 'plugins' ? '插件' : '日志'}
-          </button>
-        ))}
-      </div>
-
       {error && (
         <div className="plugkit-card" style={{ marginTop: 10 }}>
           <div className="pk-stat-label">错误</div>
@@ -297,81 +226,49 @@ function App() {
         </div>
       )}
 
-      {tab === 'plugins' && (
-        <>
-          {!error && plugins.length === 0 && (
-            <div className="plugkit-card" style={{ marginTop: 10 }}>
-              <div className="pk-stat-label">未发现 PlugKit 系列插件</div>
-              <p style={{ fontSize: 12, color: '#57606a', lineHeight: 1.7, margin: '6px 0 0' }}>
-                系列插件（名称以 PlugKit 开头，或 manifest 含 plugkit.suite="plugkit"）安装后会自动出现在这里。
-                用 <code>pnpm create-plugkit</code> 生成的新插件即自动接入。
-              </p>
-            </div>
-          )}
-
-          {plugins.length > 0 && (
-            <>
-              <input
-                className="plugkit-search"
-                placeholder="搜索插件…"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                style={{ marginTop: 10 }}
-              />
-              <div>
-                {visible.map((p) => (
-                  <PluginRow
-                    key={p.id}
-                    p={p}
-                    onToggle={(v) => onToggle(p, v)}
-                    onOpen={() => onOpen(p)}
-                    onUninstall={() => onUninstall(p)}
-                  />
-                ))}
-                {visible.length === 0 && (
-                  <div className="pk-stat-sub" style={{ padding: '12px 0' }}>
-                    没有匹配「{keyword}」的插件
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          <SectionTitle>提示</SectionTitle>
-          <p className="pk-stat-sub" style={{ margin: '4px 0 0' }}>
-            卸载不可逆；被禁用的插件功能会立即失效。本插件（管理平台）仅显示状态，不提供开关/卸载。
+      {!error && plugins.length === 0 && (
+        <div className="plugkit-card" style={{ marginTop: 10 }}>
+          <div className="pk-stat-label">未发现 PlugKit 系列插件</div>
+          <p style={{ fontSize: 12, color: '#57606a', lineHeight: 1.7, margin: '6px 0 0' }}>
+            系列插件（名称以 PlugKit 开头，或 manifest 含 plugkit.suite="plugkit"）安装后会自动出现在这里。
+            用 <code>pnpm create-plugkit</code> 生成的新插件即自动接入。
           </p>
-        </>
+        </div>
       )}
 
-      {tab === 'logs' && (
+      {plugins.length > 0 && (
         <>
-          <SectionTitle>选择插件</SectionTitle>
-          <select
-            className="plugkit-input"
-            value={selectedLogTarget}
-            onChange={(e) => setLogTarget(e.target.value)}
-            style={{ width: '100%' }}
-          >
-            {logTargets.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.displayName ?? p.name}
-                {p.isSelf ? '（本插件）' : ''}
-              </option>
-            ))}
-          </select>
-
-          <SectionTitle>运行日志</SectionTitle>
-          <LogPanel
-            logs={logs}
-            loading={logsLoading}
-            minLevel={settings.minLogLevel}
-            onMinLevel={(l: LogLevel) => setSettings((s) => ({ ...s, minLogLevel: l }))}
-            onRefresh={() => void refreshLogs(selectedLogTarget)}
-            onClear={() => void clearLogsTarget()}
+          <input
+            className="plugkit-search"
+            placeholder="搜索插件…"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            style={{ marginTop: 10 }}
           />
+          <div>
+            {visible.map((p) => (
+              <PluginRow
+                key={p.id}
+                p={p}
+                onToggle={(v) => onToggle(p, v)}
+                onOpen={() => onOpen(p)}
+                onUninstall={() => onUninstall(p)}
+              />
+            ))}
+            {visible.length === 0 && (
+              <div className="pk-stat-sub" style={{ padding: '12px 0' }}>
+                没有匹配「{keyword}」的插件
+              </div>
+            )}
+          </div>
         </>
       )}
+
+      <SectionTitle>提示</SectionTitle>
+      <p className="pk-stat-sub" style={{ margin: '4px 0 0' }}>
+        卸载不可逆；被禁用的插件功能会立即失效。本插件（插件平台）仅显示状态，不提供开关/卸载。
+        运行状态与日志请到设置页查看。
+      </p>
     </Popup>
   );
 }

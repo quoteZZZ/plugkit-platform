@@ -41,11 +41,15 @@ export async function clearPluginLogs(extensionId: string, timeoutMs = 3000): Pr
   }
 }
 
-/** 拉取插件日志：自身（manager）走本地 storage，其他插件走跨插件消息 */
-export async function fetchLogs(extensionId: string, selfId: string): Promise<LogEntry[]> {
-  if (extensionId === selfId) return getLogs();
+/** 拉取插件日志：自身（manager）走本地 storage，其他插件走跨插件消息。
+ *  返回 logs + reachable（插件后台是否可达，用于 UI 明确提示而非空白） */
+export async function fetchLogs(
+  extensionId: string,
+  selfId: string,
+): Promise<{ logs: LogEntry[]; reachable: boolean }> {
+  if (extensionId === selfId) return { logs: await getLogs(), reachable: true };
   const report = await queryPluginStatus(extensionId);
-  return report?.logs ?? [];
+  return { logs: report?.logs ?? [], reachable: report !== null };
 }
 
 /** 清空插件日志：自身走本地 storage，其他插件走跨插件消息 */

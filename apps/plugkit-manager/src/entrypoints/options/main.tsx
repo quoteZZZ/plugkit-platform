@@ -36,6 +36,7 @@ function App() {
   const [logTarget, setLogTarget] = React.useState<string>('');
   const [logs, setLogs] = React.useState<LogEntry[]>([]);
   const [logsLoading, setLogsLoading] = React.useState(false);
+  const [logsReachable, setLogsReachable] = React.useState(true);
 
   const load = React.useCallback(async () => {
     const s = await settingsStore.get();
@@ -79,8 +80,9 @@ function App() {
       if (!targetId) return;
       setLogsLoading(true);
       try {
-        const list = await fetchLogs(targetId, selfId);
+        const { logs: list, reachable } = await fetchLogs(targetId, selfId);
         setLogs(list.slice(-settings.maxLogs));
+        setLogsReachable(reachable);
       } finally {
         setLogsLoading(false);
       }
@@ -185,7 +187,7 @@ function App() {
         </Field>
       </Group>
 
-      <Group title="🖥 实时日志查看">
+      <Group title="🖥 运行状态与日志">
         {settings.logMonitor ? (
           <>
             <Field label="插件">
@@ -203,6 +205,25 @@ function App() {
                 ))}
               </select>
             </Field>
+            {!logsReachable && (
+              <div
+                className="plugkit-card"
+                style={{
+                  marginBottom: 8,
+                  background: 'var(--pk-danger-weak)',
+                  borderColor: 'var(--pk-danger)',
+                  padding: '8px 12px',
+                }}
+              >
+                <div className="pk-stat-label" style={{ color: 'var(--pk-danger)' }}>
+                  ⚠ 该插件后台不可达
+                </div>
+                <p className="pk-stat-sub" style={{ marginTop: 2 }}>
+                  无法读取其日志：插件 Service Worker 未运行或消息通道异常。请到 chrome://extensions
+                  刷新该插件后重试。
+                </p>
+              </div>
+            )}
             <LogPanel
               logs={logs}
               loading={logsLoading}
@@ -212,7 +233,7 @@ function App() {
               onClear={() => void clearLogsFor(logTarget, selfId).then(() => refreshLogs(logTarget))}
             />
             <p className="pk-stat-sub" style={{ margin: '8px 0 0' }}>
-              日志来自各插件的后台（Service Worker）运行记录；"本插件"为管理平台自身日志。
+              「本插件」为该插件平台自身日志（始终可读）；其他插件需后台运行且支持跨插件协议，否则显示不可达。
             </p>
           </>
         ) : (
