@@ -104,8 +104,8 @@ function App() {
       const bgErrors = hb
         ? hb.ok
           ? []
-          : [`后台初始化失败：${hb.err ?? '未知原因'}。规则切换可能未生效。`]
-        : ['后台尚未启动（SW 未运行）。PCDN 基础拦截由静态规则生效，规则切换/自动签到需后台运行。'];
+          : [`后台初始化失败：${hb.err ?? '未知原因'}`]
+        : ['后台未启动（SW 未运行）'];  // 拦截/签到等后台功能需其运行
       setSnap({ stats, settings, todayEstimatedMB, totalEstimatedMB, bgErrors });
       setError('');
     } catch (e) {
@@ -193,20 +193,22 @@ function App() {
 
       {bgErrors.length > 0 && (
         <div
+          title={bgErrors.join('；')}
           style={{
             marginTop: 8,
-            padding: '6px 10px',
+            padding: '4px 10px',
             borderRadius: 8,
             background: 'var(--pk-danger-weak)',
             border: '1px solid var(--pk-danger)',
             color: 'var(--pk-danger)',
             fontSize: 11,
-            lineHeight: 1.5,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
           }}
         >
-          {bgErrors.map((msg, i) => (
-            <div key={i}>{msg}</div>
-          ))}
+          {bgErrors[0]}
+          {bgErrors.length > 1 ? `（共 ${bgErrors.length} 条）` : ''}
         </div>
       )}
 
