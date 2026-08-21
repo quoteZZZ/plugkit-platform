@@ -196,13 +196,20 @@ export default defineBackground(() => {
   });
 
   getStateChannel.on(async () => {
-    await flush();
-    const stats = await statsStore.get();
-    const s = await settingsStore.get();
-    const rulesets = await chrome.declarativeNetRequest.getEnabledRulesets().catch(() => []);
-    const todayEstimatedMB = Math.round(stats.todayPcdn * s.avgChunkMB * 10) / 10;
-    const totalEstimatedMB = Math.round(stats.totalPcdn * s.avgChunkMB * 10) / 10;
-    return { stats, settings: s, enabledRulesets: rulesets, todayEstimatedMB, totalEstimatedMB };
+    // 全链路兜底：任何一步失败都返回安全快照，避免 sendMessage resolve undefined
+    // 导致 popup 永久"加载中" / options 报 TypeError。
+    try {
+      await flush().catch(() => {});
+      const stats = await statsStore.get().catch(() => ({ ...DEFAULT_STATS }));
+      const s = await settingsStore.get().catch(() => ({ ...DEFAULT_SETTINGS }));
+      const rulesets = await chrome.declarativeNetRequest.getEnabledRulesets().catch(() => []);
+      const todayEstimatedMB = Math.round(stats.todayPcdn * s.avgChunkMB * 10) / 10;
+      const totalEstimatedMB = Math.round(stats.totalPcdn * s.avgChunkMB * 10) / 10;
+      return { stats, settings: s, enabledRulesets: rulesets, todayEstimatedMB, totalEstimatedMB };
+    } catch (e) {
+      logger.error('getState 处理异常', e);
+      return { stats: { ...DEFAULT_STATS }, settings: { ...DEFAULT_SETTINGS }, enabledRulesets: [], todayEstimatedMB: 0, totalEstimatedMB: 0 };
+    }
   });
 
   setAggressiveChannel.on(async ({ on }) => {

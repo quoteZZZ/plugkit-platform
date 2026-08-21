@@ -1,5 +1,6 @@
 // 日志视图组件：级别过滤 + 刷新 + 清空 + 深色日志列表（新日志自动滚动到底部）
 import { useEffect, useRef } from 'react';
+import { Button } from '@plugkit/core/ui';
 import type { LogEntry, LogLevel } from '@plugkit/core';
 
 const LEVEL_ORDER: LogLevel[] = ['debug', 'info', 'warn', 'error'];
@@ -54,12 +55,12 @@ export function LogPanel(props: {
             </option>
           ))}
         </select>
-        <button className="plugkit-btn" onClick={onRefresh} disabled={loading}>
+        <Button onClick={onRefresh} disabled={loading}>
           {loading ? '读取中…' : '刷新'}
-        </button>
-        <button className="plugkit-btn plugkit-btn-danger" onClick={onClear}>
+        </Button>
+        <Button variant="danger" onClick={onClear}>
           清空
-        </button>
+        </Button>
       </div>
 
       <div className="plugkit-log-list" ref={listRef}>

@@ -56,7 +56,11 @@ function App() {
         displayName: e.manifest?.plugkit?.displayName ?? e.name,
         isSelf: e.id === selfId,
       }))
-      .sort((a, b) => (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name));
+      // 排序：本平台（自身）置顶，其余按显示名
+      .sort((a, b) => {
+        if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
+        return (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name);
+      });
     setPlugins(managed);
     setLogTarget((prev) => prev || managed[0]?.id || '');
   }, [selfId]);
@@ -119,9 +123,9 @@ function App() {
   const logTargets = plugins.filter((p) => (settings.showSelf ? true : !p.isSelf));
 
   return (
-    <OptionsPage title="插件管理 · 设置">
+    <OptionsPage title="插件平台 · 设置">
       <p className="subtitle">
-        集中管理 PlugKit 系列插件：列表总览、开关、日志监测——以下为管理平台自身的偏好设置。
+        集中管理 PlugKit 系列插件：列表总览、开关、日志监测——以下为插件平台自身的偏好设置。
       </p>
 
       <Group title="⚙️ 列表与刷新">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { OptionsPage, Field, Toggle, SectionTitle } from '@plugkit/core/ui';
+import { OptionsPage, Field, Toggle, SectionTitle, Button } from '@plugkit/core/ui';
 import {
   StateSnapshot,
   getStateChannel,
@@ -36,6 +36,10 @@ function App() {
           setTimeout(() => reject(new Error('后台无响应，请到 chrome://extensions 刷新该插件后重试。')), 4000),
         ),
       ]);
+      // 后台异常时 sendMessage 可能 resolve undefined，须显式校验
+      if (!s || !s.settings || !s.stats) {
+        throw new Error('后台返回异常（疑似旧版本数据）。请到 chrome://extensions 刷新该插件后重试。');
+      }
       setSnap(s);
       setError('');
       setChunkInput(String(s.settings.avgChunkMB));
@@ -81,13 +85,9 @@ function App() {
           <div className="plugkit-card">
             <div className="pk-stat-label">错误</div>
             <div className="pk-stat-value" style={{ fontSize: 14 }}>{error}</div>
-            <button
-              className="plugkit-btn plugkit-btn-primary"
-              style={{ marginTop: 10 }}
-              onClick={() => void reload()}
-            >
+            <Button variant="primary" style={{ marginTop: 10 }} onClick={() => void reload()}>
               重试
-            </button>
+            </Button>
           </div>
         ) : (
           '加载中…'
@@ -107,7 +107,7 @@ function App() {
         <Toggle label="阻止直播 WebRTC(P2P) 上传" checked={settings.blockP2p} onChange={(v) => onToggle({ blockP2p: v })} />
         <Field label="估算分片 (MB)">
           <input className="plugkit-input" type="number" value={chunkInput} onChange={(e) => setChunkInput(e.target.value)} style={{ width: 80 }} />
-          <button className="plugkit-btn" onClick={onChunk} style={{ marginLeft: 8 }}>保存</button>
+          <Button onClick={onChunk} style={{ marginLeft: 8 }}>保存</Button>
         </Field>
       </Group>
 
@@ -130,9 +130,8 @@ function App() {
             />
             <span style={{ minWidth: 42, fontSize: 13 }}>{Number(speedInput).toFixed(2)}x</span>
             {[0.75, 1, 1.25, 1.5, 2].map((p) => (
-              <button
+              <Button
                 key={p}
-                className="plugkit-btn"
                 style={{ padding: '2px 8px', fontSize: 12 }}
                 onClick={() => {
                   setSpeedInput(String(p));
@@ -140,11 +139,11 @@ function App() {
                 }}
               >
                 {p}x
-              </button>
+              </Button>
             ))}
-            <button className="plugkit-btn" onClick={onSpeed} style={{ padding: '2px 10px', fontSize: 12 }}>
+            <Button onClick={onSpeed} style={{ padding: '2px 10px', fontSize: 12 }}>
               应用
-            </button>
+            </Button>
             <span className="pk-stat-sub">0.5 – 3（手动输入可 0.1 – 16）</span>
           </div>
         </Field>
@@ -164,9 +163,9 @@ function App() {
             style={{ width: 130 }}
             placeholder="Alt+D"
           />
-          <button className="plugkit-btn" onClick={() => void onHotkey()} style={{ marginLeft: 8 }}>
+          <Button onClick={() => void onHotkey()} style={{ marginLeft: 8 }}>
             保存
-          </button>
+          </Button>
           <span className="pk-stat-sub">格式：Ctrl/Alt/Shift+按键，失焦或保存生效</span>
         </Field>
         <Field label="弹幕透明度">
@@ -196,7 +195,7 @@ function App() {
         <Field label="今日 PCDN 拦截">{stats.todayPcdn} 次（累计 {stats.totalPcdn}）</Field>
         <Field label="今日阻止上传">{fmtBytes(stats.todayP2pBytes)}（{stats.todayP2pCalls} 次）</Field>
         <Field label="今日清理广告">{stats.todayAdRemoved} 个元素（累计 {stats.totalAdRemoved}）</Field>
-        <button className="plugkit-btn plugkit-btn-danger" onClick={onReset}>清零统计</button>
+        <Button variant="danger" onClick={onReset}>清零统计</Button>
       </Group>
 
       <Group title="📖 使用说明">

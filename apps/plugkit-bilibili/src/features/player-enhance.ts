@@ -1,7 +1,7 @@
 // feature: 播放增强——自定义倍速 / 自动宽屏 / 记忆进度 / 自动播放
 // 原则：只在"新视频元素出现"时应用一次，不做持续覆盖——用户手动调整不被干扰。
 import { BiliSettings } from '../shared/types';
-import { waitFor } from './util';
+import { settingsStore, waitFor } from './util';
 
 const PROGRESS_KEY = 'plugkit:bili-progress';
 
@@ -65,24 +65,41 @@ async function applyAutoPlay(video: HTMLVideoElement): Promise<void> {
 }
 
 export function startPlayerEnhance(s: BiliSettings): void {
+  // 当前生效倍速（随设置实时更新，供 SPA 复用/新视频应用）
+  let currentSpeed = s.customSpeed;
+
+  // 对页面当前所有 video 应用倍速（倍速=1 视为不干预，跳过）
+  const applySpeedToAll = (spd: number) => {
+    if (spd <= 0 || spd === 1) return;
+    for (const v of document.querySelectorAll<HTMLVideoElement>('video')) {
+      void applySpeed(v, spd);
+    }
+  };
+
   void (async () => {
     const video = await waitFor<HTMLVideoElement>('video', 10_000);
     if (!video) return;
-    if (s.customSpeed > 0 && s.customSpeed !== 1) await applySpeed(video, s.customSpeed);
+    if (currentSpeed > 0 && currentSpeed !== 1) await applySpeed(video, currentSpeed);
     if (s.autoWidescreen) await applyWidescreen();
     if (s.rememberProgress) await applyRemember(video);
     if (s.autoPlay) await applyAutoPlay(video);
   })();
 
   // SPA 内切换视频时，video 元素被复用，但 src 变化：监听 loadedmetadata 重新应用
-  if (s.customSpeed > 0 && s.customSpeed !== 1) {
-    document.addEventListener(
-      'loadedmetadata',
-      (e) => {
-        const t = e.target;
-        if (t instanceof HTMLVideoElement) void applySpeed(t, s.customSpeed);
-      },
-      true,
-    );
-  }
+  document.addEventListener(
+    'loadedmetadata',
+    (e) => {
+      const t = e.target;
+      if (t instanceof HTMLVideoElement && currentSpeed !== 1) void applySpeed(t, currentSpeed);
+    },
+    true,
+  );
+
+  // 倍速在 options 改动后实时生效（含已打开页面），无需刷新
+  settingsStore.watch((ns) => {
+    if (ns.customSpeed !== currentSpeed) {
+      currentSpeed = ns.customSpeed;
+      applySpeedToAll(ns.customSpeed);
+    }
+  });
 }

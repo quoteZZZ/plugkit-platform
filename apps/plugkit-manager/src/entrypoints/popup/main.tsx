@@ -121,7 +121,11 @@ function App() {
           category: e.manifest?.plugkit?.category ?? 'PlugKit',
           isSelf: e.id === selfId,
         }))
-        .sort((a, b) => (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name));
+        // 排序：本平台（自身）置顶，其余按显示名
+        .sort((a, b) => {
+          if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
+          return (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name);
+        });
       setPlugins(managed);
       setError('');
     } catch (e) {
@@ -217,7 +221,7 @@ function App() {
     <Popup>
       <div className="plugkit-popup-header">
         <img src={chrome.runtime.getURL('icons/48.png')} width={28} height={28} style={{ borderRadius: 6 }} alt="" />
-        <h3 style={{ flex: 1 }}>插件管理</h3>
+        <h3 style={{ flex: 1 }}>插件平台</h3>
         <Badge tone={plugins.length > 0 ? 'accent' : 'muted'}>
           {plugins.length > 0 ? `${enabledCount}/${plugins.length} 启用` : '无插件'}
         </Badge>

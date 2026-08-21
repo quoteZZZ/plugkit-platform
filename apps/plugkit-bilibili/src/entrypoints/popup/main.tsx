@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
-import { Popup, Toggle, StatCard, SectionTitle, Badge } from '@plugkit/core/ui';
+import { Popup, Toggle, StatCard, SectionTitle, Badge, Button } from '@plugkit/core/ui';
 import {
   StateSnapshot,
   getStateChannel,
@@ -64,6 +64,10 @@ function App() {
           ),
         ),
       ]);
+      // 后台异常时 sendMessage 可能 resolve undefined，须显式校验，避免永久"加载中"
+      if (!snap || !snap.settings || !snap.stats) {
+        throw new Error('后台返回异常（疑似旧版本数据）。请到 chrome://extensions 刷新该插件后重试。');
+      }
       setSnap(snap);
       setError('');
     } catch (e) {
@@ -98,13 +102,9 @@ function App() {
         <div className="plugkit-card">
           <div className="pk-stat-label">错误</div>
           <div className="pk-stat-value" style={{ fontSize: 14 }}>{error}</div>
-          <button
-            className="plugkit-btn plugkit-btn-primary"
-            style={{ marginTop: 10 }}
-            onClick={() => void reload()}
-          >
+          <Button variant="primary" style={{ marginTop: 10 }} onClick={() => void reload()}>
             重试
-          </button>
+          </Button>
         </div>
       </Popup>
     );
@@ -176,21 +176,15 @@ function App() {
 
       <SectionTitle>操作</SectionTitle>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button className="plugkit-btn plugkit-btn-primary" onClick={onCheckin}>
+        <Button variant="primary" onClick={onCheckin}>
           立即签到
-        </button>
-        <button
-          className="plugkit-btn"
-          onClick={() => void browser.tabs.create({ url: 'https://www.bilibili.com/' })}
-        >
+        </Button>
+        <Button onClick={() => void browser.tabs.create({ url: 'https://www.bilibili.com/' })}>
           打开 B 站
-        </button>
-        <button
-          className="plugkit-btn"
-          onClick={() => void browser.runtime.openOptionsPage()}
-        >
+        </Button>
+        <Button onClick={() => void browser.runtime.openOptionsPage()}>
           详细设置
-        </button>
+        </Button>
       </div>
       {checkin && <div className="pk-stat-sub" style={{ marginTop: 8 }}>{checkin}</div>}
     </Popup>

@@ -8,8 +8,8 @@ export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   // 管理平台：只需 management（读/开关扩展）+ storage，不再需要注入网页的权限
   manifest: {
-    name: 'PlugKit Manager（插件管理）',
-    description: '集中管理你用 PlugKit 开发的系列浏览器插件：开关、配置、卸载',
+    name: 'PlugKit 插件平台',
+    description: 'PlugKit 插件平台：集中管理系列浏览器插件，支持开关、配置、卸载与运行日志监测',
     permissions: ['management', 'storage'],
     icons: {
       16: 'icons/16.png',
@@ -18,7 +18,7 @@ export default defineConfig({
       128: 'icons/128.png',
     },
     action: {
-      default_title: 'PlugKit Manager',
+      default_title: 'PlugKit 插件平台',
       default_popup: 'popup.html',
       default_icon: { 16: 'icons/16.png', 32: 'icons/32.png' },
     },
@@ -29,7 +29,7 @@ export default defineConfig({
       (manifest as Record<string, unknown>).plugkit = {
         suite: 'plugkit',
         pluginId: 'manager',
-        displayName: '插件管理',
+        displayName: '插件平台',
         category: '平台',
       };
     },
