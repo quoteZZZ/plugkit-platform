@@ -27,6 +27,7 @@ function App() {
   const [chunkInput, setChunkInput] = React.useState('2');
   const [speedInput, setSpeedInput] = React.useState('1');
   const [hotkeyInput, setHotkeyInput] = React.useState('Alt+D');
+  const [allowlistInput, setAllowlistInput] = React.useState('');
 
   const reload = React.useCallback(async () => {
     try {
@@ -45,6 +46,7 @@ function App() {
       setChunkInput(String(s.settings.avgChunkMB));
       setSpeedInput(String(s.settings.customSpeed));
       setHotkeyInput(s.settings.danmakuHotkey);
+      setAllowlistInput((s.settings.pcdnAllowlist ?? []).join(', '));
     } catch (e) {
       setError(String(e));
     }
@@ -77,6 +79,14 @@ function App() {
     const v = hotkeyInput.trim();
     if (v) await onToggle({ danmakuHotkey: v });
   };
+  const onAllowlist = async () => {
+    // 逗号/空白分隔为域名数组，过滤非法字符
+    const domains = allowlistInput
+      .split(/[,，\s]+/)
+      .map((d) => d.trim().toLowerCase())
+      .filter((d) => /^[a-z0-9.-]+$/.test(d));
+    await onToggle({ pcdnAllowlist: domains });
+  };
 
   if (!snap) {
     return (
@@ -105,6 +115,18 @@ function App() {
         <Toggle label="PCDN 域名拦截" checked={settings.masterOn} onChange={(v) => onToggle({ masterOn: v })} />
         <Toggle label="激进档：全部 *.bilivideo.cn 等（慎开）" checked={settings.aggressive} onChange={(v) => onToggle({ aggressive: v })} />
         <Toggle label="阻止直播 WebRTC(P2P) 上传" checked={settings.blockP2p} onChange={(v) => onToggle({ blockP2p: v })} />
+        <Field label="例外域名">
+          <input
+            className="plugkit-input"
+            value={allowlistInput}
+            onChange={(e) => setAllowlistInput(e.target.value)}
+            onBlur={() => void onAllowlist()}
+            style={{ flex: 1, minWidth: 180 }}
+            placeholder="cdn.example.com, mirror.example.net"
+          />
+          <Button onClick={() => void onAllowlist()}>保存</Button>
+          <span className="pk-stat-sub">逗号分隔，命中域名不拦截（处理误伤）</span>
+        </Field>
         <Field label="估算分片 (MB)">
           <input className="plugkit-input" type="number" value={chunkInput} onChange={(e) => setChunkInput(e.target.value)} style={{ width: 80 }} />
           <Button onClick={onChunk} style={{ marginLeft: 8 }}>保存</Button>
@@ -150,6 +172,7 @@ function App() {
         <Toggle label="自动宽屏" checked={settings.autoWidescreen} onChange={(v) => onToggle({ autoWidescreen: v })} />
         <Toggle label="记忆播放进度" checked={settings.rememberProgress} onChange={(v) => onToggle({ rememberProgress: v })} />
         <Toggle label="自动播放（可能被浏览器策略拦截）" checked={settings.autoPlay} onChange={(v) => onToggle({ autoPlay: v })} />
+        <Toggle label="显示视频清晰度/编码" checked={settings.showVideoInfo} onChange={(v) => onToggle({ showVideoInfo: v })} />
       </Group>
 
       <Group title="💬 弹幕管理">
@@ -189,6 +212,7 @@ function App() {
         <Toggle label="每日自动签到（保守：仅签到，不投币/分享）" checked={settings.autoCheckin} onChange={(v) => onToggle({ autoCheckin: v })} />
         <Toggle label="播放页显示 UP 主属地" checked={settings.showOwnerLocation} onChange={(v) => onToggle({ showOwnerLocation: v })} />
         <Toggle label="播放页显示「复制封面」按钮" checked={settings.coverButton} onChange={(v) => onToggle({ coverButton: v })} />
+        <Toggle label="播放页显示「复制标题链接」按钮" checked={settings.copyLinkButton} onChange={(v) => onToggle({ copyLinkButton: v })} />
       </Group>
 
       <Group title="📊 统计">

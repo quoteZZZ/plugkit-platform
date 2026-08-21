@@ -64,6 +64,42 @@ async function applyAutoPlay(video: HTMLVideoElement): Promise<void> {
   }
 }
 
+/** 分辨率标签：videoHeight → 常用清晰度文案 */
+function qualityLabel(h: number): string {
+  if (h >= 2160) return '4K';
+  if (h >= 1440) return '2K';
+  if (h >= 1080) return '1080P';
+  if (h >= 720) return '720P';
+  if (h >= 480) return '480P';
+  return `${h}P`;
+}
+
+/** 播放页右下角悬浮清晰度徽标（低打扰，仅在有视频尺寸时显示） */
+function startVideoInfo(video: HTMLVideoElement): void {
+  const badge = document.createElement('span');
+  badge.id = 'plugkit-video-info';
+  badge.style.cssText =
+    'position:fixed;right:12px;bottom:12px;z-index:99999;padding:2px 9px;border-radius:6px;' +
+    'background:rgba(0,0,0,.55);color:#fff;font-size:12px;pointer-events:none;display:none;font-family:system-ui,sans-serif;';
+  document.body.appendChild(badge);
+
+  const update = () => {
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) {
+      badge.style.display = 'none';
+      return;
+    }
+    badge.textContent = `${qualityLabel(h)} ${w}×${h}`;
+    badge.style.display = 'block';
+  };
+  video.addEventListener('resize', update);
+  video.addEventListener('loadedmetadata', update);
+  // SPA 切视频时 src 变化也刷新
+  video.addEventListener('durationchange', update);
+  update();
+}
+
 export function startPlayerEnhance(s: BiliSettings): void {
   // 当前生效倍速（随设置实时更新，供 SPA 复用/新视频应用）
   let currentSpeed = s.customSpeed;
@@ -83,6 +119,7 @@ export function startPlayerEnhance(s: BiliSettings): void {
     if (s.autoWidescreen) await applyWidescreen();
     if (s.rememberProgress) await applyRemember(video);
     if (s.autoPlay) await applyAutoPlay(video);
+    if (s.showVideoInfo) startVideoInfo(video);
   })();
 
   // SPA 内切换视频时，video 元素被复用，但 src 变化：监听 loadedmetadata 重新应用

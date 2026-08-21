@@ -47,6 +47,8 @@ export type BiliSettings = {
   aggressive: boolean;
   /** 是否阻止直播 WebRTC(P2P) 上传 */
   blockP2p: boolean;
+  /** 例外域名白名单：命中域名不拦截（逗号分隔存储为数组） */
+  pcdnAllowlist: string[];
   /** 估算用平均视频分片大小（MB） */
   avgChunkMB: number;
   // —— 页面净化 ——
@@ -63,6 +65,8 @@ export type BiliSettings = {
   rememberProgress: boolean;
   /** 自动播放 */
   autoPlay: boolean;
+  /** 播放页显示清晰度/编码信息 */
+  showVideoInfo: boolean;
   // —— 弹幕管理 ——
   /** 弹幕管理总开关（快捷键/透明度） */
   danmaku: boolean;
@@ -79,6 +83,8 @@ export type BiliSettings = {
   showOwnerLocation: boolean;
   /** 播放页显示封面获取按钮 */
   coverButton: boolean;
+  /** 播放页显示复制标题+链接按钮 */
+  copyLinkButton: boolean;
 };
 
 /** 今日日期 yyyy-mm-dd */
@@ -93,6 +99,7 @@ export const DEFAULT_SETTINGS: BiliSettings = {
   masterOn: true,
   aggressive: false,
   blockP2p: true,
+  pcdnAllowlist: [],
   avgChunkMB: 2,
   adClean: true,
   playerEnhance: true,
@@ -100,6 +107,7 @@ export const DEFAULT_SETTINGS: BiliSettings = {
   autoWidescreen: true,
   rememberProgress: true,
   autoPlay: false,
+  showVideoInfo: true,
   danmaku: true,
   danmakuHotkey: 'Alt+D',
   danmakuOpacity: 100,
@@ -107,6 +115,7 @@ export const DEFAULT_SETTINGS: BiliSettings = {
   autoCheckin: true,
   showOwnerLocation: true,
   coverButton: true,
+  copyLinkButton: true,
 };
 
 export const DEFAULT_STATS: BiliStats = {

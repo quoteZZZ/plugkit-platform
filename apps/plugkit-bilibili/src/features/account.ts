@@ -57,6 +57,33 @@ function addCoverButton(): void {
   })();
 }
 
+function addCopyLinkButton(): void {
+  void (async () => {
+    const container = await waitFor('.video-info-container, .video-desc-container', 6000);
+    if (!container) return;
+    if (document.querySelector('#plugkit-copy-link')) return;
+    const btn = document.createElement('button');
+    btn.id = 'plugkit-copy-link';
+    btn.textContent = '复制标题链接';
+    btn.style.cssText =
+      'margin-left:8px;padding:2px 10px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;cursor:pointer;font-size:12px;';
+    btn.addEventListener('click', () => {
+      const title = getInitialState()?.videoData?.title ?? document.title.replace(/_哔哩哔哩.*$/, '').trim();
+      const text = `[${title}](${location.href})`;
+      void navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          btn.textContent = '已复制 ✓';
+          setTimeout(() => (btn.textContent = '复制标题链接'), 1500);
+        })
+        .catch(() => {
+          btn.textContent = '复制失败';
+        });
+    });
+    container.appendChild(btn);
+  })();
+}
+
 function addOwnerLocation(): void {
   void (async () => {
     const nameEl = await waitFor('.up-name, .bili-video-card__info--author, .name', 6000);
@@ -74,5 +101,6 @@ function addOwnerLocation(): void {
 
 export function startAccountTools(s: BiliSettings): void {
   if (s.coverButton) addCoverButton();
+  if (s.copyLinkButton) addCopyLinkButton();
   if (s.showOwnerLocation) addOwnerLocation();
 }

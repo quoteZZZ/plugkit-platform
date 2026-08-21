@@ -1,5 +1,5 @@
-// 日志视图组件：级别过滤 + 刷新 + 清空 + 深色日志列表（新日志自动滚动到底部）
-import { useEffect, useRef } from 'react';
+// 日志视图组件：级别过滤 + 关键词搜索 + 刷新 + 清空 + 深色日志列表（新日志自动滚动到底部）
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@plugkit/core/ui';
 import type { LogEntry, LogLevel } from '@plugkit/core';
 
@@ -30,11 +30,19 @@ export function LogPanel(props: {
   onClear: () => void;
 }) {
   const { logs, loading, minLevel, onMinLevel, onRefresh, onClear } = props;
+  const [keyword, setKeyword] = useState('');
+
   const threshold = LEVEL_ORDER.indexOf(minLevel);
-  const visible = logs.filter((e) => LEVEL_ORDER.indexOf(e.level) >= threshold);
+  const kw = keyword.trim().toLowerCase();
+  // 级别 + 关键词双重过滤（关键词命中消息或命名空间）
+  const visible = logs.filter((e) => {
+    if (LEVEL_ORDER.indexOf(e.level) < threshold) return false;
+    if (!kw) return true;
+    return e.msg.toLowerCase().includes(kw) || e.ns.toLowerCase().includes(kw);
+  });
 
   const listRef = useRef<HTMLDivElement>(null);
-  // 日志条数变化（新增/清空）时滚动到底部，保证最新可见
+  // 日志条数变化（新增/清空/过滤）时滚动到底部，保证最新可见
   const count = visible.length;
   useEffect(() => {
     const el = listRef.current;
@@ -43,7 +51,7 @@ export function LogPanel(props: {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
         <select
           className="plugkit-input"
           value={minLevel}
@@ -55,6 +63,13 @@ export function LogPanel(props: {
             </option>
           ))}
         </select>
+        <input
+          className="plugkit-search"
+          placeholder="搜索关键词（消息/命名空间）…"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          style={{ flex: 1, minWidth: 120 }}
+        />
         <Button onClick={onRefresh} disabled={loading}>
           {loading ? '读取中…' : '刷新'}
         </Button>
@@ -67,7 +82,7 @@ export function LogPanel(props: {
         {visible.length === 0 ? (
           <div className="plugkit-log-row">
             <span className="plugkit-log-msg" style={{ color: '#8c959f' }}>
-              {loading ? '读取中…' : '暂无日志'}
+              {kw ? '无匹配日志' : loading ? '读取中…' : '暂无日志'}
             </span>
           </div>
         ) : (

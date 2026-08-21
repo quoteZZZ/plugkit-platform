@@ -95,6 +95,38 @@ export default defineBackground(() => {
     await statsStore.set(withDaily(stats));
   }
 
+  /** 白名单域名命中判断（URL 是否属于任一例外域名） */
+  function isAllowlisted(url: string): boolean {
+    return (settings.pcdnAllowlist ?? []).some((d) => d && url.includes(d));
+  }
+
+  /** 同步白名单动态 allow 规则：优先级高于 block 规则，命中即放行 */
+  const ALLOW_RULE_BASE = 9000;
+  async function syncAllowlist(domains: string[]): Promise<void> {
+    const clean = (domains ?? [])
+      .map((d) => d.trim().toLowerCase())
+      .filter((d) => /^[a-z0-9.-]+$/.test(d));
+    try {
+      const existing = await chrome.declarativeNetRequest.getDynamicRules().catch(() => []);
+      const removeRuleIds = existing
+        .map((r) => r.id)
+        .filter((id) => id >= ALLOW_RULE_BASE);
+      const addRules = clean.map((d, i) => ({
+        id: ALLOW_RULE_BASE + i,
+        priority: 100,
+        action: { type: 'allow' as const },
+        condition: {
+          urlFilter: `||${d}`,
+          resourceTypes: ['xmlhttprequest', 'media', 'websocket', 'other', 'ping'] as const,
+        },
+      }));
+      await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
+      if (clean.length > 0) logger.info(`白名单已同步：${clean.join(', ')}`);
+    } catch (e) {
+      logger.error('同步白名单失败', e);
+    }
+  }
+
   /** 应用规则集启用状态（storage 为准，幂等） */
   async function applyRulesets() {
     const s = await settingsStore.get();
@@ -115,6 +147,8 @@ export default defineBackground(() => {
         })
         .catch((e) => logger.error('更新 DNR 规则集失败', e));
     }
+    // 白名单与规则集同步
+    await syncAllowlist(s.pcdnAllowlist);
   }
 
   /** 每日签到（保守版：仅签到接口，不动投币/分享） */
@@ -155,7 +189,8 @@ export default defineBackground(() => {
   // —— 1) PCDN 请求计数（observe 模式，非阻塞）——
   chrome.webRequest.onBeforeRequest.addListener(
     (detail) => {
-      if (settings.masterOn && matchesPcdn(detail.url, settings.aggressive)) {
+      // 白名单命中的请求不算拦截（已被 allow 规则放行），避免统计虚高
+      if (settings.masterOn && !isAllowlisted(detail.url) && matchesPcdn(detail.url, settings.aggressive)) {
         buf += 1;
         if (buf >= 20) void flush();
       }
@@ -238,7 +273,9 @@ export default defineBackground(() => {
 
   updateSettingsChannel.on(async ({ patch }) => {
     await settingsStore.set(patch);
-    if ('masterOn' in patch || 'aggressive' in patch) await applyRulesets();
+    if ('masterOn' in patch || 'aggressive' in patch || 'pcdnAllowlist' in patch) {
+      await applyRulesets();
+    }
   });
 
   checkinChannel.on(async () => doCheckin());

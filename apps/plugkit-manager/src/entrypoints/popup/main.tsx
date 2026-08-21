@@ -16,6 +16,8 @@ interface ManagedPlugin {
   optionsUrl?: string;
   displayName?: string;
   category?: string;
+  description?: string;
+  homepageUrl?: string;
   isSelf: boolean;
 }
 
@@ -26,6 +28,8 @@ function PluginRow(props: {
   onUninstall: () => void;
 }) {
   const { p, onToggle, onOpen, onUninstall } = props;
+  const [expanded, setExpanded] = React.useState(false);
+  const hasDetail = p.description || p.homepageUrl;
   return (
     <div
       style={{
@@ -80,7 +84,41 @@ function PluginRow(props: {
               卸载
             </Button>
           )}
+          {hasDetail && (
+            <Button
+              onClick={() => setExpanded((v) => !v)}
+              style={{ padding: '3px 10px', fontSize: 12 }}
+            >
+              {expanded ? '收起 ▲' : '详情 ▼'}
+            </Button>
+          )}
         </div>
+
+        {expanded && hasDetail && (
+          <div
+            style={{
+              marginTop: 8,
+              padding: '8px 10px',
+              borderRadius: 8,
+              background: 'var(--pk-bg)',
+              fontSize: 12,
+              color: 'var(--pk-text-secondary)',
+              lineHeight: 1.7,
+              wordBreak: 'break-all',
+            }}
+          >
+            {p.description && <div>{p.description}</div>}
+            <div style={{ marginTop: 4, color: 'var(--pk-text-muted)' }}>扩展 ID：{p.id}</div>
+            {p.homepageUrl && (
+              <div>
+                主页：
+                <a href={p.homepageUrl} target="_blank" rel="noreferrer">
+                  {p.homepageUrl}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -119,6 +157,8 @@ function App() {
           optionsUrl: e.optionsUrl,
           displayName: e.manifest?.plugkit?.displayName ?? e.name,
           category: e.manifest?.plugkit?.category ?? 'PlugKit',
+          description: e.description,
+          homepageUrl: e.homepageUrl,
           isSelf: e.id === selfId,
         }))
         // 排序：本平台（自身）置顶，其余按显示名

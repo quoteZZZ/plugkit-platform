@@ -148,20 +148,23 @@ function App() {
       </div>
 
       <SectionTitle>今日统计</SectionTitle>
+      {/* 前两张统计卡并排，压缩弹窗高度 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <StatCard
+          label="PCDN 拦截"
+          value={String(stats.todayPcdn)}
+          sub={`累计 ${stats.totalPcdn} 次`}
+        />
+        <StatCard
+          label="阻止上传"
+          value={fmtBytes(stats.todayP2pBytes)}
+          sub={`${stats.todayP2pCalls} 次调用`}
+        />
+      </div>
       <StatCard
-        label="PCDN 拦截（精确）"
-        value={String(stats.todayPcdn)}
-        sub={`累计 ${stats.totalPcdn} 次 · 估算省 ${snap.todayEstimatedMB} MB`}
-      />
-      <StatCard
-        label="阻止上传（精确）"
-        value={fmtBytes(stats.todayP2pBytes)}
-        sub={`${stats.todayP2pCalls} 次调用 · 累计 ${fmtBytes(stats.totalP2pBytes)}`}
-      />
-      <StatCard
-        label="清理广告（精确）"
+        label="清理广告"
         value={String(stats.todayAdRemoved)}
-        sub={`累计 ${stats.totalAdRemoved} 个元素`}
+        sub={`累计 ${stats.totalAdRemoved} 个 · 估算省 ${snap.todayEstimatedMB} MB`}
       />
 
       {stats.daily.length > 0 && <TrendChart daily={stats.daily} />}
