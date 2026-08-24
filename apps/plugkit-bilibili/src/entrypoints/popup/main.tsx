@@ -237,9 +237,9 @@ function App() {
         </div>
       </div>
 
-      {/* 段3 · 功能开关 */}
+      {/* 段3 · 功能开关（多列网格，紧凑不占行） */}
       <div className="plugkit-section-title">功能</div>
-      <div className="plugkit-card" style={{ padding: '2px 12px' }}>
+      <div className="plugkit-card plugkit-toggle-grid" style={{ padding: '2px 12px' }}>
         <Toggle label="广告净化" checked={settings.adClean} onChange={(v) => void writeSettings({ adClean: v })} />
         <Toggle label="播放增强" checked={settings.playerEnhance} onChange={(v) => void writeSettings({ playerEnhance: v })} />
         <Toggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void writeSettings({ danmaku: v })} />
@@ -247,19 +247,14 @@ function App() {
         <Toggle label="夜间模式" checked={settings.nightMode} onChange={(v) => void writeSettings({ nightMode: v })} />
       </div>
 
-      {/* 段3b · 下载/导出（折叠） */}
-      <details
-        className="plugkit-card"
-        style={{ marginTop: 8, padding: '6px 12px', fontSize: 12, color: 'var(--pk-text-secondary)' }}
-      >
-        <summary style={{ cursor: 'pointer', userSelect: 'none' }}>下载 / 导出（播放页）</summary>
-        <div style={{ padding: '6px 0 2px' }}>
-          <Toggle label="下载封面" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
-          <Toggle label="下载视频" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
-          <Toggle label="下载字幕" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
-          <Toggle label="导出弹幕" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
-        </div>
-      </details>
+      {/* 段3b · 下载/导出（网格平铺，替代折叠下拉） */}
+      <div className="plugkit-section-title">下载 / 导出</div>
+      <div className="plugkit-card plugkit-toggle-grid" style={{ padding: '2px 12px' }}>
+        <Toggle label="下载封面" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
+        <Toggle label="下载视频" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
+        <Toggle label="下载字幕" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
+        <Toggle label="导出弹幕" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
+      </div>
 
       {/* 段4 · 操作 */}
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>

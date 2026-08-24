@@ -203,6 +203,24 @@ body {
 }
 .plugkit-toggle:last-child { border-bottom: none; }
 .plugkit-toggle.disabled { opacity: 0.55; }
+
+/* 紧凑网格布局：popup 功能开关多列平铺，减少纵向占位 */
+.plugkit-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  column-gap: 14px;
+  align-items: center;
+}
+.plugkit-toggle-grid .plugkit-toggle {
+  border-bottom: none;
+  padding: 7px 2px;
+  overflow: hidden;
+}
+.plugkit-toggle-grid .plugkit-toggle > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* 仅滑块区域可点击（点击文字不触发） */
 .plugkit-toggle .control {
   position: relative;
