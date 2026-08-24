@@ -1,22 +1,11 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
-import { OptionsPage, Field, Toggle, SectionTitle } from '@plugkit/core/ui';
+import { OptionsPage, Field, Toggle, Card } from '@plugkit/core/ui';
 import type { LogEntry, LogLevel } from '@plugkit/core';
 import { LogPanel } from '../../components/LogPanel';
 import { settingsStore, type HubSettings } from '../../shared/types';
 import { fetchLogs, clearLogsFor } from '../../shared/hub';
-
-function Group(props: { title: string; children: React.ReactNode }) {
-  return (
-    <>
-      <SectionTitle>{props.title}</SectionTitle>
-      <div className="plugkit-card" style={{ padding: '8px 16px' }}>
-        {props.children}
-      </div>
-    </>
-  );
-}
 
 interface ManagedPlugin {
   id: string;
@@ -130,7 +119,7 @@ function App() {
         集中管理 PlugKit 系列插件：列表总览、开关、日志监测——以下为插件平台自身的偏好设置。
       </p>
 
-      <Group title="⚙️ 列表与刷新">
+      <Card title="⚙️ 列表与刷新">
         <Toggle
           label="列表中显示自身（管理平台）"
           checked={settings.showSelf}
@@ -153,9 +142,9 @@ function App() {
           />
           <span className="pk-stat-sub" style={{ marginLeft: 8 }}>≥ 2 秒，回车或失焦生效</span>
         </Field>
-      </Group>
+      </Card>
 
-      <Group title="📋 日志监测">
+      <Card title="📋 日志监测">
         <Toggle
           label="启用日志监测"
           checked={settings.logMonitor}
@@ -185,9 +174,9 @@ function App() {
             <option value="error">error</option>
           </select>
         </Field>
-      </Group>
+      </Card>
 
-      <Group title="🖥 运行状态与日志">
+      <Card title="🖥 运行状态与日志">
         {settings.logMonitor ? (
           <>
             <Field label="插件">
@@ -239,12 +228,12 @@ function App() {
         ) : (
           <p className="pk-stat-sub">日志监测已关闭，可在上方「日志监测」分组开启。</p>
         )}
-      </Group>
+      </Card>
 
-      <Group title="📖 说明">
+      <Card title="📖 说明">
         <Field label="识别">仅 manifest 含 <code>plugkit.suite</code>（或名称以 PlugKit 开头）的插件会被列出。</Field>
         <Field label="权限">management（读/开关扩展）、storage。</Field>
-      </Group>
+      </Card>
     </OptionsPage>
   );
 }
