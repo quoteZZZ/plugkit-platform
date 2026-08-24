@@ -23,17 +23,6 @@ function yesterdayStr(): string {
   ).padStart(2, '0')}`;
 }
 
-/** 把时间戳格式化为"x分钟前" */
-function formatAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return '刚刚';
-  if (m < 60) return `${m} 分钟前`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h} 小时前`;
-  return `${Math.floor(h / 24)} 天前`;
-}
-
 /** 带"较昨日"对比的紧凑统计块（趋势图已移除，对比信息承载"看变化"需求） */
 function MiniStat({
   label,
@@ -256,25 +245,21 @@ function App() {
         <Toggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void writeSettings({ danmaku: v })} />
         <Toggle label="账号工具" checked={settings.accountTools} onChange={(v) => void writeSettings({ accountTools: v })} />
         <Toggle label="夜间模式" checked={settings.nightMode} onChange={(v) => void writeSettings({ nightMode: v })} />
-        <Toggle label="下载封面（播放页）" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
-        <Toggle label="下载视频（播放页）" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
-        <Toggle label="下载字幕（播放页）" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
-        <Toggle label="导出弹幕（播放页）" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
       </div>
 
-      {/* 可验证性：P2P 上传拦截最近生效时间（解决"看不出有没有在工作"） */}
-      <div
+      {/* 段3b · 下载/导出（折叠） */}
+      <details
         className="plugkit-card"
-        style={{ marginTop: 8, padding: '6px 12px', fontSize: 11, color: 'var(--pk-text-secondary)' }}
+        style={{ marginTop: 8, padding: '6px 12px', fontSize: 12, color: 'var(--pk-text-secondary)' }}
       >
-        P2P 上传拦截：
-        {stats.lastP2pBlock
-          ? `最近生效 ${formatAgo(stats.lastP2pBlock)}`
-          : '暂未触发（仅在看直播时拦截 WebRTC 上传）'}
-        <div className="pk-stat-sub" style={{ marginTop: 2 }}>
-          下载/导出等按钮仅在 B 站<strong>视频播放页</strong>出现
+        <summary style={{ cursor: 'pointer', userSelect: 'none' }}>下载 / 导出（播放页）</summary>
+        <div style={{ padding: '6px 0 2px' }}>
+          <Toggle label="下载封面" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
+          <Toggle label="下载视频" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
+          <Toggle label="下载字幕" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
+          <Toggle label="导出弹幕" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
         </div>
-      </div>
+      </details>
 
       {/* 段4 · 操作 */}
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
