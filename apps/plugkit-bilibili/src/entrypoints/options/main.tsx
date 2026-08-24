@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { OptionsPage, Field, Toggle, Card } from '@plugkit/core/ui';
+import { OptionsPage, Field, Toggle, Card, HotkeyInput } from '@plugkit/core/ui';
 import {
   BiliSettings,
   BiliStats,
@@ -82,14 +82,6 @@ function App() {
     if (Number.isFinite(v) && v >= 0.1 && v <= 16) await onToggle({ customSpeed: v });
     else alert('倍速需在 0.1 – 16 之间');
   };
-  const onHotkey = async () => {
-    const v = hotkeyInput.trim();
-    if (v) await onToggle({ danmakuHotkey: v });
-  };
-  const onNightHotkey = async () => {
-    const v = nightHotkeyInput.trim();
-    if (v) await onToggle({ nightModeHotkey: v });
-  };
   const onAllowlist = async () => {
     const domains = allowlistInput
       .split(/[,，\s]+/)
@@ -162,16 +154,8 @@ function App() {
       <Card title="🌙 夜间模式">
         <Toggle label="启用夜间模式（暗色主题）" checked={settings.nightMode} onChange={(v) => onToggle({ nightMode: v })} />
         <Field label="夜间模式快捷键">
-          <input
-            className="plugkit-input"
-            value={nightHotkeyInput}
-            onChange={(e) => setNightHotkeyInput(e.target.value)}
-            onBlur={() => void onNightHotkey()}
-            style={{ width: 130 }}
-            placeholder="Alt+N"
-          />
-          <button className="plugkit-btn" style={{ marginLeft: 8 }} onClick={() => void onNightHotkey()}>保存</button>
-          <span className="pk-stat-sub">格式：Ctrl/Alt/Shift+按键，失焦或保存生效</span>
+          <HotkeyInput value={nightHotkeyInput} onChange={(v) => { setNightHotkeyInput(v); void onToggle({ nightModeHotkey: v }); }} />
+          <span className="pk-stat-sub">点击输入框后按下组合键录制，失焦取消</span>
         </Field>
       </Card>
 
@@ -181,10 +165,12 @@ function App() {
 
       <Card title="⬇️ 下载 / 导出">
         <Toggle label="播放页显示「下载封面」按钮" checked={settings.coverDownload} onChange={(v) => onToggle({ coverDownload: v })} />
+        <Toggle label="播放页显示「下载视频」按钮" checked={settings.videoDownload} onChange={(v) => onToggle({ videoDownload: v })} />
+        <Toggle label="播放页显示「下载字幕」按钮" checked={settings.subtitleDownload} onChange={(v) => onToggle({ subtitleDownload: v })} />
         <Toggle label="播放页显示「导出弹幕」按钮" checked={settings.danmakuExport} onChange={(v) => onToggle({ danmakuExport: v })} />
         <p className="pk-stat-sub" style={{ margin: '4px 0 0' }}>
-          这两个按钮会在 B站<strong>视频播放页</strong>的视频信息区出现；封面走浏览器下载、弹幕导出为 XML。
-          跨域受限时自动降级（新标签打开 / 错误提示）并弹出 toast 反馈。
+          这些按钮会在 B站<strong>视频播放页</strong>的视频信息区出现：封面走浏览器下载、视频为当前可用最高画质直链、
+          字幕转 Srt、弹幕导出为 XML。跨域受限时自动降级（新标签打开 / 错误提示）并弹出 toast 反馈。
         </p>
       </Card>
 
@@ -229,16 +215,8 @@ function App() {
       <Card title="💬 弹幕管理">
         <Toggle label="弹幕管理（快捷键一键开关）" checked={settings.danmaku} onChange={(v) => onToggle({ danmaku: v })} />
         <Field label="弹幕快捷键">
-          <input
-            className="plugkit-input"
-            value={hotkeyInput}
-            onChange={(e) => setHotkeyInput(e.target.value)}
-            onBlur={() => void onHotkey()}
-            style={{ width: 130 }}
-            placeholder="Alt+D"
-          />
-          <button className="plugkit-btn" style={{ marginLeft: 8 }} onClick={() => void onHotkey()}>保存</button>
-          <span className="pk-stat-sub">格式：Ctrl/Alt/Shift+按键，失焦或保存生效</span>
+          <HotkeyInput value={hotkeyInput} onChange={(v) => { setHotkeyInput(v); void onToggle({ danmakuHotkey: v }); }} />
+          <span className="pk-stat-sub">点击输入框后按下组合键录制，失焦取消</span>
         </Field>
         <Field label="弹幕透明度">
           <input
@@ -273,7 +251,7 @@ function App() {
 
       <Card title="📖 使用说明">
         <Field label="快捷键">Alt + D：一键开关弹幕（需启用弹幕管理）；Alt + N：切换夜间模式（需启用夜间模式）。</Field>
-        <Field label="播放页">视频页自动生效：UP 属地标签、复制封面/链接按钮、下载封面/导出弹幕按钮、自定义倍速（设置后刷新页面）。</Field>
+        <Field label="播放页">视频页自动生效：UP 属地标签、复制封面/链接按钮、下载封面/视频/字幕/导出弹幕按钮、自定义倍速（设置后刷新页面）。</Field>
         <Field label="签到">开启「每日自动签到」后，每天定时执行一次（需后台在运行且已登录 B 站）。B 站接口不支持扩展页面直连（CORS），故不提供手动按钮。</Field>
         <Field label="统计口径">PCDN 拦截次数与阻止上传字节为精确值；估算省流量按「拦截次数 × 分片大小」推算，仅供参考。</Field>
       </Card>

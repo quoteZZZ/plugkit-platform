@@ -8,4 +8,5 @@ export { StatCard } from './components/StatCard';
 export { SectionTitle } from './components/SectionTitle';
 export { Badge } from './components/Badge';
 export { Card } from './components/Card';
+export { HotkeyInput } from './components/HotkeyInput';
 export { useChromeStorage, useHotkey } from './hooks';

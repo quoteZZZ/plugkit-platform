@@ -257,6 +257,8 @@ function App() {
         <Toggle label="账号工具" checked={settings.accountTools} onChange={(v) => void writeSettings({ accountTools: v })} />
         <Toggle label="夜间模式" checked={settings.nightMode} onChange={(v) => void writeSettings({ nightMode: v })} />
         <Toggle label="下载封面（播放页）" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
+        <Toggle label="下载视频（播放页）" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
+        <Toggle label="下载字幕（播放页）" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
         <Toggle label="导出弹幕（播放页）" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
       </div>
 
@@ -270,7 +272,7 @@ function App() {
           ? `最近生效 ${formatAgo(stats.lastP2pBlock)}`
           : '暂未触发（仅在看直播时拦截 WebRTC 上传）'}
         <div className="pk-stat-sub" style={{ marginTop: 2 }}>
-          封面/弹幕/属地等按钮仅在 B 站<strong>视频播放页</strong>出现
+          下载/导出等按钮仅在 B 站<strong>视频播放页</strong>出现
         </div>
       </div>
 

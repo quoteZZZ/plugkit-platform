@@ -97,6 +97,10 @@ export type BiliSettings = {
   // —— 下载 / 导出 ——
   /** 播放页显示「下载封面」按钮（保存到本地） */
   coverDownload: boolean;
+  /** 播放页显示「下载视频」按钮（当前画质直链下载） */
+  videoDownload: boolean;
+  /** 播放页显示「下载字幕」按钮（Srt 下载） */
+  subtitleDownload: boolean;
   /** 播放页显示「导出弹幕」按钮（XML 下载） */
   danmakuExport: boolean;
 };
@@ -134,6 +138,8 @@ export const DEFAULT_SETTINGS: BiliSettings = {
   nightMode: false,
   nightModeHotkey: 'Alt+N',
   coverDownload: true,
+  videoDownload: true,
+  subtitleDownload: true,
   danmakuExport: true,
 };
 
