@@ -22,6 +22,10 @@ function App() {
   const [hotkeyInput, setHotkeyInput] = React.useState('Alt+D');
   const [nightHotkeyInput, setNightHotkeyInput] = React.useState('Alt+N');
   const [allowlistInput, setAllowlistInput] = React.useState('');
+  /** 清零统计二次确认（MV3 扩展页禁用 confirm/alert，用内联交互替代） */
+  const [confirmReset, setConfirmReset] = React.useState(false);
+  /** 倍速输入校验错误（内联展示，替代 alert） */
+  const [speedError, setSpeedError] = React.useState('');
 
   // init=true 时初始化输入框 state；false 仅刷新数据（避免覆盖用户正在编辑的输入）
   const reload = React.useCallback(async (init = false) => {
@@ -69,13 +73,16 @@ function App() {
     await writeSettings(patch);
   };
   const onReset = async () => {
-    if (confirm('确定清零全部统计？')) {
-      await chrome.storage.local.set({
-        [STATS_KEY]: { ...DEFAULT_STATS, today: todayStr(), lastResetAt: Date.now() },
-      });
-      await reload(false);
-      alert('统计已清零');
+    // 点击 → 先进入确认态；再点一次才真正清零（替代被 MV3 禁用的 confirm）
+    if (!confirmReset) {
+      setConfirmReset(true);
+      return;
     }
+    await chrome.storage.local.set({
+      [STATS_KEY]: { ...DEFAULT_STATS, today: todayStr(), lastResetAt: Date.now() },
+    });
+    setConfirmReset(false);
+    await reload(false);
   };
   const onChunk = async () => {
     const v = parseFloat(chunkInput);
@@ -83,8 +90,12 @@ function App() {
   };
   const onSpeed = async () => {
     const v = parseFloat(speedInput);
-    if (Number.isFinite(v) && v >= 0.1 && v <= 16) await onToggle({ customSpeed: v });
-    else alert('倍速需在 0.1 – 16 之间');
+    if (Number.isFinite(v) && v >= 0.1 && v <= 16) {
+      setSpeedError('');
+      await onToggle({ customSpeed: v });
+    } else {
+      setSpeedError('倍速需在 0.1 – 16 之间');
+    }
   };
   const onAllowlist = async () => {
     const domains = allowlistInput
@@ -207,6 +218,9 @@ function App() {
             ))}
             <button className="plugkit-btn" onClick={onSpeed} style={{ padding: '2px 10px', fontSize: 12 }}>应用</button>
             <span className="pk-stat-sub">0.5 – 3（手动输入可 0.1 – 16）</span>
+            {speedError && (
+              <span style={{ fontSize: 12, color: 'var(--pk-danger)', width: '100%' }}>{speedError}</span>
+            )}
           </div>
         </Field>
         <Toggle label="自动宽屏" checked={settings.autoWidescreen} onChange={(v) => onToggle({ autoWidescreen: v })} />
@@ -250,7 +264,23 @@ function App() {
         <Field label="今日 PCDN 拦截">{stats.todayPcdn} 次（累计 {stats.totalPcdn}）</Field>
         <Field label="今日阻止上传">{fmtBytes(stats.todayP2pBytes)}（{stats.todayP2pCalls} 次）</Field>
         <Field label="今日清理广告">{stats.todayAdRemoved} 个元素（累计 {stats.totalAdRemoved}）</Field>
-        <button className="plugkit-btn plugkit-btn-danger" onClick={onReset}>清零统计</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+          {confirmReset ? (
+            <>
+              <span style={{ fontSize: 12, color: 'var(--pk-danger)' }}>确认清零全部统计？</span>
+              <button className="plugkit-btn plugkit-btn-danger" onClick={() => void onReset()}>
+                确认清零
+              </button>
+              <button className="plugkit-btn" onClick={() => setConfirmReset(false)}>
+                取消
+              </button>
+            </>
+          ) : (
+            <button className="plugkit-btn plugkit-btn-danger" onClick={() => void onReset()}>
+              清零统计
+            </button>
+          )}
+        </div>
       </Card>
 
       <Card title="📖 使用说明">

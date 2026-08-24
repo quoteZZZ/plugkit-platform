@@ -20,6 +20,9 @@ function App() {
   const [plugins, setPlugins] = React.useState<ManagedPlugin[]>([]);
   const [refreshInput, setRefreshInput] = React.useState('');
   const [maxLogsInput, setMaxLogsInput] = React.useState('');
+  /** 输入校验错误（内联展示，替代被 MV3 禁用的 alert） */
+  const [refreshErr, setRefreshErr] = React.useState('');
+  const [maxLogsErr, setMaxLogsErr] = React.useState('');
 
   // 日志监测状态
   const [logTarget, setLogTarget] = React.useState<string>('');
@@ -95,19 +98,23 @@ function App() {
 
   const onRefreshSeconds = async () => {
     const v = parseInt(refreshInput, 10);
-    if (Number.isFinite(v) && v >= 2) await update({ refreshSeconds: v });
-    else {
+    if (Number.isFinite(v) && v >= 2) {
+      setRefreshErr('');
+      await update({ refreshSeconds: v });
+    } else {
+      setRefreshErr('刷新间隔需 ≥ 2 秒');
       setRefreshInput(String(settings.refreshSeconds));
-      alert('刷新间隔需 ≥ 2 秒');
     }
   };
 
   const onMaxLogs = async () => {
     const v = parseInt(maxLogsInput, 10);
-    if (Number.isFinite(v) && v >= 10) await update({ maxLogs: v });
-    else {
+    if (Number.isFinite(v) && v >= 10) {
+      setMaxLogsErr('');
+      await update({ maxLogs: v });
+    } else {
+      setMaxLogsErr('日志条数需 ≥ 10');
       setMaxLogsInput(String(settings.maxLogs));
-      alert('日志条数需 ≥ 10');
     }
   };
 
@@ -141,6 +148,9 @@ function App() {
             style={{ width: 80 }}
           />
           <span className="pk-stat-sub" style={{ marginLeft: 8 }}>≥ 2 秒，回车或失焦生效</span>
+          {refreshErr && (
+            <span style={{ fontSize: 12, color: 'var(--pk-danger)', width: '100%' }}>{refreshErr}</span>
+          )}
         </Field>
       </Card>
 
@@ -161,6 +171,9 @@ function App() {
             style={{ width: 80 }}
           />
           <span className="pk-stat-sub" style={{ marginLeft: 8 }}>每插件展示条数（≥ 10）</span>
+          {maxLogsErr && (
+            <span style={{ fontSize: 12, color: 'var(--pk-danger)', width: '100%' }}>{maxLogsErr}</span>
+          )}
         </Field>
         <Field label="最低级别">
           <select

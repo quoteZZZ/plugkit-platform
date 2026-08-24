@@ -27,6 +27,7 @@ function PluginCard(props: {
 }) {
   const { p, onToggle, onOpen, onUninstall } = props;
   const [expanded, setExpanded] = React.useState(false);
+  const [confirming, setConfirming] = React.useState(false);
   const hasDetail = p.description || p.homepageUrl;
   return (
     <div className="plugkit-card" style={{ padding: 12, marginBottom: 8 }}>
@@ -97,9 +98,37 @@ function PluginCard(props: {
           </Button>
         )}
         {!p.isSelf && (
-          <Button variant="danger" onClick={onUninstall} style={{ padding: '3px 10px', fontSize: 12 }}>
-            卸载
-          </Button>
+          confirming ? (
+            <span style={{ fontSize: 12, color: 'var(--pk-danger)' }}>确认卸载？</span>
+          ) : (
+            <Button
+              variant="danger"
+              onClick={() => setConfirming(true)}
+              style={{ padding: '3px 10px', fontSize: 12 }}
+            >
+              卸载
+            </Button>
+          )
+        )}
+        {confirming && !p.isSelf && (
+          <>
+            <Button
+              variant="danger"
+              onClick={() => {
+                setConfirming(false);
+                onUninstall();
+              }}
+              style={{ padding: '3px 10px', fontSize: 12 }}
+            >
+              确认
+            </Button>
+            <Button
+              onClick={() => setConfirming(false)}
+              style={{ padding: '3px 10px', fontSize: 12 }}
+            >
+              取消
+            </Button>
+          </>
         )}
         {hasDetail && (
           <Button
@@ -211,10 +240,9 @@ function App() {
     }
   };
   const onUninstall = async (p: ManagedPlugin) => {
-    if (confirm(`确定卸载「${p.displayName ?? p.name}」？此操作不可撤销。`)) {
-      await browser.management.uninstall(p.id);
-      reload();
-    }
+    // 二次确认已在卡片内完成（confirm 在 MV3 popup 被禁用，UI 提供内联确认）
+    await browser.management.uninstall(p.id);
+    reload();
   };
 
   const kw = keyword.trim().toLowerCase();
