@@ -1,7 +1,7 @@
 {
   "name": "plugkit-platform",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "packageManager": "pnpm@10.28.2",
   "scripts": {
     "create-plugkit": "node scripts/create-plugkit.mjs",

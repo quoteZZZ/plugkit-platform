@@ -5,9 +5,15 @@ import '../theme.css';
 export function Badge({
   tone = 'muted',
   children,
+  style,
 }: {
   tone?: 'success' | 'muted' | 'accent' | 'danger';
   children: React.ReactNode;
+  style?: React.CSSProperties;
 }) {
-  return <span className={`plugkit-badge ${tone}`}>{children}</span>;
+  return (
+    <span className={`plugkit-badge ${tone}`} style={style}>
+      {children}
+    </span>
+  );
 }

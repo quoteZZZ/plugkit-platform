@@ -53,9 +53,19 @@ function PluginCard(props: {
           </div>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, fontSize: 13 }}>{p.displayName ?? p.name}</span>
-            <Badge tone="muted">v{p.version}</Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <span
+              style={{
+                fontWeight: 600,
+                fontSize: 13,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {p.displayName ?? p.name}
+            </span>
+            <Badge tone="muted" style={{ flexShrink: 0 }}>v{p.version}</Badge>
           </div>
           <div style={{ marginTop: 3, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             <Badge tone="accent">{p.category ?? 'PlugKit'}</Badge>
@@ -298,10 +308,6 @@ function App() {
           </div>
         </>
       )}
-
-      <p className="pk-stat-sub" style={{ marginTop: 10, textAlign: 'center' }}>
-        卸载不可逆 · 详情见设置页
-      </p>
     </Popup>
   );
 }
