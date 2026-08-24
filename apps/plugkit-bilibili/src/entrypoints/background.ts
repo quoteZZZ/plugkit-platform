@@ -23,6 +23,8 @@ export default defineBackground(() => {
 
   // 内存缓冲：webRequest 计数先入内存，定期/事件触发 flush（避免频繁写 storage）
   let buf = 0;
+  /** buf 开始累积的时间戳：flush 时若早于用户清零时间(lastResetAt)，说明是清零前残留，丢弃 */
+  let bufSince = Date.now();
   let settings: BiliSettings = { ...DEFAULT_SETTINGS };
 
   // 后台自诊断：最近捕获的错误（最多 5 条），写入 storage 供 UI 显示
@@ -47,10 +49,15 @@ export default defineBackground(() => {
   async function flush() {
     try {
       let stats = rollStats(await statsStore.get());
+      // 用户清零发生在 buf 开始累积之后 → 丢弃这期间残留的计数，避免"清零后又涨回"
       if (buf > 0) {
-        stats.todayPcdn += buf;
-        stats.totalPcdn += buf;
-        buf = 0;
+        if (stats.lastResetAt && bufSince < stats.lastResetAt) {
+          buf = 0;
+        } else {
+          stats.todayPcdn += buf;
+          stats.totalPcdn += buf;
+          buf = 0;
+        }
       }
       await statsStore.set(rollStats(stats));
     } catch (e) {
@@ -173,6 +180,7 @@ export default defineBackground(() => {
       (detail) => {
         // 白名单命中的请求不算拦截（已被 allow 规则放行），避免统计虚高
         if (settings.masterOn && !isAllowlisted(detail.url) && matchesPcdn(detail.url, settings.aggressive)) {
+          if (buf === 0) bufSince = Date.now();
           buf += 1;
           if (buf >= 20) void flush();
         }

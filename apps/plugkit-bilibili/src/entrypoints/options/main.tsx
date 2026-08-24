@@ -70,7 +70,11 @@ function App() {
   };
   const onReset = async () => {
     if (confirm('确定清零全部统计？')) {
-      await chrome.storage.local.set({ [STATS_KEY]: { ...DEFAULT_STATS, today: todayStr() } });
+      await chrome.storage.local.set({
+        [STATS_KEY]: { ...DEFAULT_STATS, today: todayStr(), lastResetAt: Date.now() },
+      });
+      await reload(false);
+      alert('统计已清零');
     }
   };
   const onChunk = async () => {

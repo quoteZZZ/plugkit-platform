@@ -140,6 +140,9 @@ function App() {
               variant="danger"
               onClick={async () => {
                 await chrome.storage.local.remove([SETTINGS_KEY, STATS_KEY]);
+                await chrome.storage.local.set({
+                  [STATS_KEY]: { ...DEFAULT_STATS, today: todayStr(), lastResetAt: Date.now() },
+                });
                 setError('');
                 await reload();
               }}
@@ -256,9 +259,6 @@ function App() {
           详细设置
         </Button>
       </div>
-      <p className="pk-stat-sub" style={{ margin: '8px 0 0', textAlign: 'center' }}>
-        下载/导出（封面/视频/字幕/弹幕）等播放页按钮在<strong>详细设置</strong>中配置
-      </p>
     </Popup>
   );
 }

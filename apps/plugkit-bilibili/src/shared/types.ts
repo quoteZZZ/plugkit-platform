@@ -38,6 +38,8 @@ export type BiliStats = {
   daily: DayStat[];
   /** 最近一次成功阻止 P2P 上传的时间戳(ms)；null 表示从未拦截（用于可验证性展示） */
   lastP2pBlock: number | null;
+  /** 用户手动清零统计的时间戳(ms)；null 表示从未清零（后台 flush 据此丢弃清零前累积的 buf） */
+  lastResetAt: number | null;
 };
 
 /** 插件设置（持久化于 chrome.storage.local） */
@@ -172,6 +174,8 @@ export function rollStats(stats: BiliStats): BiliStats {
       totalP2pBytes: stats.totalP2pBytes,
       totalAdRemoved: stats.totalAdRemoved,
       daily,
+      lastP2pBlock: stats.lastP2pBlock ?? null,
+      lastResetAt: stats.lastResetAt ?? null,
     };
   }
   // 无论是否跨天，都同步 daily 末项为今天的实时值
@@ -202,6 +206,7 @@ export const DEFAULT_STATS: BiliStats = {
   totalAdRemoved: 0,
   daily: [],
   lastP2pBlock: null,
+  lastResetAt: null,
 };
 
 /** 状态快照：popup / options 读取用 */

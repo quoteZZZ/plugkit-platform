@@ -1,6 +1,6 @@
 {
   "name": "@plugkit/plugin-manager",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "scripts": {
     "dev": "pnpm exec wxt",
     "build": "pnpm exec wxt build",
