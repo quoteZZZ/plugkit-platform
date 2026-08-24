@@ -237,7 +237,7 @@ function App() {
         </div>
       </div>
 
-      {/* 段3 · 功能开关（胶囊并排，紧凑省空间） */}
+      {/* 段3 · 核心功能（胶囊并排） */}
       <div className="plugkit-section-title">功能</div>
       <div className="plugkit-card" style={{ padding: '8px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         <ChipToggle label="广告净化" checked={settings.adClean} onChange={(v) => void writeSettings({ adClean: v })} />
@@ -245,15 +245,6 @@ function App() {
         <ChipToggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void writeSettings({ danmaku: v })} />
         <ChipToggle label="账号工具" checked={settings.accountTools} onChange={(v) => void writeSettings({ accountTools: v })} />
         <ChipToggle label="夜间模式" checked={settings.nightMode} onChange={(v) => void writeSettings({ nightMode: v })} />
-      </div>
-
-      {/* 段3b · 下载/导出（胶囊并排） */}
-      <div className="plugkit-section-title">下载 / 导出</div>
-      <div className="plugkit-card" style={{ padding: '8px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        <ChipToggle label="下载封面" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
-        <ChipToggle label="下载视频" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
-        <ChipToggle label="下载字幕" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
-        <ChipToggle label="导出弹幕" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
       </div>
 
       {/* 段4 · 操作 */}
@@ -265,6 +256,9 @@ function App() {
           详细设置
         </Button>
       </div>
+      <p className="pk-stat-sub" style={{ margin: '8px 0 0', textAlign: 'center' }}>
+        下载/导出（封面/视频/字幕/弹幕）等播放页按钮在<strong>详细设置</strong>中配置
+      </p>
     </Popup>
   );
 }
