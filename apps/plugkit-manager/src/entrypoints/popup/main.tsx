@@ -55,6 +55,7 @@ function PluginCard(props: {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
             <span
+              title={p.displayName ?? p.name}
               style={{
                 fontWeight: 600,
                 fontSize: 13,

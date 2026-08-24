@@ -253,6 +253,43 @@ body {
 .plugkit-toggle input:checked + .track { background: var(--pk-accent); }
 .plugkit-toggle input:checked + .track::after { transform: translateX(14px); }
 
+/* 胶囊式紧凑开关（ChipToggle）：popup 多开关并排，省垂直空间 */
+.plugkit-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--pk-border);
+  border-radius: 999px;
+  background: var(--pk-surface);
+  color: var(--pk-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.plugkit-chip-toggle:hover { border-color: var(--pk-accent); color: var(--pk-text); }
+.plugkit-chip-toggle .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid var(--pk-text-muted);
+  box-sizing: border-box;
+  transition: all 0.15s;
+}
+.plugkit-chip-toggle.on {
+  border-color: var(--pk-accent);
+  background: var(--pk-accent-weak);
+  color: var(--pk-accent);
+  font-weight: 600;
+}
+.plugkit-chip-toggle.on .dot {
+  background: var(--pk-accent);
+  border-color: var(--pk-accent);
+}
+.plugkit-chip-toggle.disabled { opacity: 0.55; cursor: not-allowed; }
+
 /* 键值行 */
 .plugkit-field {
   display: flex;

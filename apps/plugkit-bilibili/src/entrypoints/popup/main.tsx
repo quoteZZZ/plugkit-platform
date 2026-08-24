@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
-import { Popup, Toggle, Badge, Button } from '@plugkit/core/ui';
+import { Popup, Toggle, Badge, Button, ChipToggle } from '@plugkit/core/ui';
 import {
   BiliSettings,
   BiliStats,
@@ -237,23 +237,23 @@ function App() {
         </div>
       </div>
 
-      {/* 段3 · 功能开关（多列网格，紧凑不占行） */}
+      {/* 段3 · 功能开关（胶囊并排，紧凑省空间） */}
       <div className="plugkit-section-title">功能</div>
-      <div className="plugkit-card plugkit-toggle-grid" style={{ padding: '2px 12px' }}>
-        <Toggle label="广告净化" checked={settings.adClean} onChange={(v) => void writeSettings({ adClean: v })} />
-        <Toggle label="播放增强" checked={settings.playerEnhance} onChange={(v) => void writeSettings({ playerEnhance: v })} />
-        <Toggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void writeSettings({ danmaku: v })} />
-        <Toggle label="账号工具" checked={settings.accountTools} onChange={(v) => void writeSettings({ accountTools: v })} />
-        <Toggle label="夜间模式" checked={settings.nightMode} onChange={(v) => void writeSettings({ nightMode: v })} />
+      <div className="plugkit-card" style={{ padding: '8px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <ChipToggle label="广告净化" checked={settings.adClean} onChange={(v) => void writeSettings({ adClean: v })} />
+        <ChipToggle label="播放增强" checked={settings.playerEnhance} onChange={(v) => void writeSettings({ playerEnhance: v })} />
+        <ChipToggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void writeSettings({ danmaku: v })} />
+        <ChipToggle label="账号工具" checked={settings.accountTools} onChange={(v) => void writeSettings({ accountTools: v })} />
+        <ChipToggle label="夜间模式" checked={settings.nightMode} onChange={(v) => void writeSettings({ nightMode: v })} />
       </div>
 
-      {/* 段3b · 下载/导出（网格平铺，替代折叠下拉） */}
+      {/* 段3b · 下载/导出（胶囊并排） */}
       <div className="plugkit-section-title">下载 / 导出</div>
-      <div className="plugkit-card plugkit-toggle-grid" style={{ padding: '2px 12px' }}>
-        <Toggle label="下载封面" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
-        <Toggle label="下载视频" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
-        <Toggle label="下载字幕" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
-        <Toggle label="导出弹幕" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
+      <div className="plugkit-card" style={{ padding: '8px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <ChipToggle label="下载封面" checked={settings.coverDownload} onChange={(v) => void writeSettings({ coverDownload: v })} />
+        <ChipToggle label="下载视频" checked={settings.videoDownload} onChange={(v) => void writeSettings({ videoDownload: v })} />
+        <ChipToggle label="下载字幕" checked={settings.subtitleDownload} onChange={(v) => void writeSettings({ subtitleDownload: v })} />
+        <ChipToggle label="导出弹幕" checked={settings.danmakuExport} onChange={(v) => void writeSettings({ danmakuExport: v })} />
       </div>
 
       {/* 段4 · 操作 */}

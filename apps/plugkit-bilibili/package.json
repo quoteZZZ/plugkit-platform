@@ -1,6 +1,6 @@
 {
   "name": "@plugkit/plugin-bilibili",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "scripts": {
     "dev": "pnpm exec wxt",
     "build": "pnpm exec wxt build",
