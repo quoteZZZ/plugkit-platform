@@ -18,7 +18,8 @@ interface ManagedPlugin {
   isSelf: boolean;
 }
 
-function PluginRow(props: {
+/** 插件卡片：插件中心风格，每个插件独立成卡 */
+function PluginCard(props: {
   p: ManagedPlugin;
   onToggle: (enabled: boolean) => void;
   onOpen: () => void;
@@ -28,95 +29,102 @@ function PluginRow(props: {
   const [expanded, setExpanded] = React.useState(false);
   const hasDetail = p.description || p.homepageUrl;
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 10,
-        alignItems: 'flex-start',
-        padding: '10px 0',
-        borderBottom: '1px solid #eaeef2',
-      }}
-    >
-      {p.iconUrl ? (
-        <img src={p.iconUrl} width={32} height={32} style={{ borderRadius: 8, flexShrink: 0 }} alt="" />
-      ) : (
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            background: '#ddf4ff',
-            color: '#1f6feb',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: 14,
-            flexShrink: 0,
-          }}
-        >
-          {(p.displayName ?? p.name).slice(0, 1)}
-        </div>
-      )}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ fontWeight: 600, fontSize: 13 }}>{p.displayName ?? p.name}</span>
-          <Badge tone="muted">v{p.version}</Badge>
-          <Badge tone="accent">{p.category ?? 'PlugKit'}</Badge>
-          {p.isSelf && <Badge tone="success">本插件</Badge>}
-        </div>
-        <div style={{ marginTop: 6, display: 'flex', gap: 8, alignItems: 'center' }}>
-          {p.isSelf ? (
-            <span style={{ fontSize: 12, color: '#8c959f' }}>正在运行</span>
-          ) : (
-            <Toggle label="启用" checked={p.enabled} onChange={onToggle} />
-          )}
-          {p.optionsUrl && (
-            <Button onClick={onOpen} style={{ padding: '3px 10px', fontSize: 12 }}>
-              {p.isSelf ? '设置' : '配置'}
-            </Button>
-          )}
-          {!p.isSelf && (
-            <Button variant="danger" onClick={onUninstall} style={{ padding: '3px 10px', fontSize: 12 }}>
-              卸载
-            </Button>
-          )}
-          {hasDetail && (
-            <Button
-              onClick={() => setExpanded((v) => !v)}
-              style={{ padding: '3px 10px', fontSize: 12 }}
-            >
-              {expanded ? '收起 ▲' : '详情 ▼'}
-            </Button>
-          )}
-        </div>
-
-        {expanded && hasDetail && (
+    <div className="plugkit-card" style={{ padding: 12, marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        {p.iconUrl ? (
+          <img src={p.iconUrl} width={34} height={34} style={{ borderRadius: 8, flexShrink: 0 }} alt="" />
+        ) : (
           <div
             style={{
-              marginTop: 8,
-              padding: '8px 10px',
+              width: 34,
+              height: 34,
               borderRadius: 8,
-              background: 'var(--pk-bg)',
-              fontSize: 12,
-              color: 'var(--pk-text-secondary)',
-              lineHeight: 1.7,
-              wordBreak: 'break-all',
+              background: 'var(--pk-accent-weak)',
+              color: 'var(--pk-accent)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: 15,
+              flexShrink: 0,
             }}
           >
-            {p.description && <div>{p.description}</div>}
-            <div style={{ marginTop: 4, color: 'var(--pk-text-muted)' }}>扩展 ID：{p.id}</div>
-            {p.homepageUrl && (
-              <div>
-                主页：
-                <a href={p.homepageUrl} target="_blank" rel="noreferrer">
-                  {p.homepageUrl}
-                </a>
-              </div>
-            )}
+            {(p.displayName ?? p.name).slice(0, 1)}
           </div>
         )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>{p.displayName ?? p.name}</span>
+            <Badge tone="muted">v{p.version}</Badge>
+          </div>
+          <div style={{ marginTop: 3, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            <Badge tone="accent">{p.category ?? 'PlugKit'}</Badge>
+            {p.isSelf && <Badge tone="success">本插件</Badge>}
+          </div>
+        </div>
+        <span
+          title={p.enabled ? '已启用' : '已停用'}
+          style={{
+            width: 9,
+            height: 9,
+            borderRadius: 999,
+            background: p.enabled ? 'var(--pk-success)' : 'var(--pk-text-muted)',
+            flexShrink: 0,
+          }}
+        />
       </div>
+
+      <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        {p.isSelf ? (
+          <span style={{ fontSize: 12, color: 'var(--pk-success)', fontWeight: 600 }}>● 运行中</span>
+        ) : (
+          <Toggle label="启用" checked={p.enabled} onChange={onToggle} />
+        )}
+        {p.optionsUrl && (
+          <Button onClick={onOpen} style={{ padding: '3px 10px', fontSize: 12 }}>
+            {p.isSelf ? '设置' : '配置'}
+          </Button>
+        )}
+        {!p.isSelf && (
+          <Button variant="danger" onClick={onUninstall} style={{ padding: '3px 10px', fontSize: 12 }}>
+            卸载
+          </Button>
+        )}
+        {hasDetail && (
+          <Button
+            onClick={() => setExpanded((v) => !v)}
+            style={{ padding: '3px 10px', fontSize: 12, marginLeft: 'auto' }}
+          >
+            {expanded ? '收起 ▲' : '详情 ▼'}
+          </Button>
+        )}
+      </div>
+
+      {expanded && hasDetail && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: '8px 10px',
+            borderRadius: 8,
+            background: 'var(--pk-bg)',
+            fontSize: 12,
+            color: 'var(--pk-text-secondary)',
+            lineHeight: 1.7,
+            wordBreak: 'break-all',
+          }}
+        >
+          {p.description && <div>{p.description}</div>}
+          <div style={{ marginTop: 4, color: 'var(--pk-text-muted)' }}>扩展 ID：{p.id}</div>
+          {p.homepageUrl && (
+            <div>
+              主页：
+              <a href={p.homepageUrl} target="_blank" rel="noreferrer">
+                {p.homepageUrl}
+              </a>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -219,6 +227,33 @@ function App() {
         </Badge>
       </div>
 
+      {/* 概览条：插件总数 / 启用数一目了然 */}
+      <div
+        style={{
+          marginTop: 10,
+          padding: '8px 12px',
+          borderRadius: 8,
+          background: 'var(--pk-accent-weak)',
+          border: '1px solid var(--pk-accent)',
+          display: 'flex',
+          justifyContent: 'space-around',
+          textAlign: 'center',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--pk-accent)' }}>{plugins.length}</div>
+          <div style={{ fontSize: 11, color: 'var(--pk-text-secondary)' }}>插件总数</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--pk-success)' }}>{enabledCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--pk-text-secondary)' }}>已启用</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--pk-text)' }}>{plugins.length - enabledCount}</div>
+          <div style={{ fontSize: 11, color: 'var(--pk-text-secondary)' }}>已停用</div>
+        </div>
+      </div>
+
       {error && (
         <div className="plugkit-card" style={{ marginTop: 10 }}>
           <div className="pk-stat-label">错误</div>
@@ -245,9 +280,9 @@ function App() {
             onChange={(e) => setKeyword(e.target.value)}
             style={{ marginTop: 10 }}
           />
-          <div>
+          <div style={{ marginTop: 4 }}>
             {visible.map((p) => (
-              <PluginRow
+              <PluginCard
                 key={p.id}
                 p={p}
                 onToggle={(v) => onToggle(p, v)}

@@ -6,6 +6,7 @@ import {
   BiliStats,
   DEFAULT_SETTINGS,
   DEFAULT_STATS,
+  rollStats,
   todayStr,
 } from '../../shared/types';
 import { fmtBytes } from '../../shared/format';
@@ -37,7 +38,7 @@ function App() {
     try {
       const raw = await chrome.storage.local.get([SETTINGS_KEY, STATS_KEY]);
       const settings = { ...DEFAULT_SETTINGS, ...((raw[SETTINGS_KEY] ?? {}) as Partial<BiliSettings>) };
-      const stats = { ...DEFAULT_STATS, ...((raw[STATS_KEY] ?? {}) as Partial<BiliStats>) };
+      const stats = rollStats({ ...DEFAULT_STATS, ...((raw[STATS_KEY] ?? {}) as Partial<BiliStats>) } as BiliStats);
       setData({ stats, settings });
       setError('');
       if (init) {

@@ -2,7 +2,7 @@
 // 策略：MutationObserver 增量检查新增节点（选择器命中 + 文本关键词双重判断），
 // 另加低频选择器兜底扫描（SPA 切换页面）。误删防护：不碰播放器区域/视频。
 // 统计上报：直写 chrome.storage.local（纯 storage 驱动，不走消息通道）
-import { DEFAULT_STATS, todayStr } from '../shared/types';
+import { BiliStats, DEFAULT_STATS, rollStats } from '../shared/types';
 import { elText } from './util';
 
 const STATS_KEY = 'plugkit:bili:stats';
@@ -24,19 +24,11 @@ let pending = 0;
 async function persistAdCount(count: number): Promise<void> {
   try {
     const raw = await chrome.storage.local.get(STATS_KEY);
-    const stats = { ...DEFAULT_STATS, ...(raw[STATS_KEY] ?? {}) };
+    let stats = { ...DEFAULT_STATS, ...(raw[STATS_KEY] ?? {}) } as BiliStats;
+    stats = rollStats(stats); // 跨天归零今日项（修复"非当天数据"）
     stats.todayAdRemoved += count;
     stats.totalAdRemoved += count;
-    // 同步 daily 当天项
-    const today = todayStr();
-    const daily = (stats.daily ?? []).slice();
-    let last = daily[daily.length - 1];
-    if (!last || last.date !== today) {
-      last = { date: today, pcdn: 0, p2pBytes: 0, adRemoved: 0 };
-      daily.push(last);
-    }
-    last.adRemoved = stats.todayAdRemoved;
-    stats.daily = daily.slice(-7);
+    stats = rollStats(stats); // 把最新值同步进 daily 当天项
     await chrome.storage.local.set({ [STATS_KEY]: stats });
   } catch {
     /* 统计写入失败不影响净化功能 */

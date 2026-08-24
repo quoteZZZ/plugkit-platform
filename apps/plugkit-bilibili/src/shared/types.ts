@@ -36,6 +36,8 @@ export type BiliStats = {
   totalAdRemoved: number;
   /** 近 7 天每日统计（末项为今天，随 today* 实时同步） */
   daily: DayStat[];
+  /** 最近一次成功阻止 P2P 上传的时间戳(ms)；null 表示从未拦截（用于可验证性展示） */
+  lastP2pBlock: number | null;
 };
 
 /** 插件设置（持久化于 chrome.storage.local） */
@@ -87,6 +89,16 @@ export type BiliSettings = {
   coverButton: boolean;
   /** 播放页显示复制标题+链接按钮 */
   copyLinkButton: boolean;
+  // —— 夜间模式 ——
+  /** 夜间模式总开关（覆盖 B站浅色为暗色主题） */
+  nightMode: boolean;
+  /** 夜间模式快捷键（默认 Alt+N） */
+  nightModeHotkey: string;
+  // —— 下载 / 导出 ——
+  /** 播放页显示「下载封面」按钮（保存到本地） */
+  coverDownload: boolean;
+  /** 播放页显示「导出弹幕」按钮（XML 下载） */
+  danmakuExport: boolean;
 };
 
 /** 今日日期 yyyy-mm-dd */
@@ -119,7 +131,58 @@ export const DEFAULT_SETTINGS: BiliSettings = {
   showOwnerLocation: true,
   coverButton: true,
   copyLinkButton: true,
+  nightMode: false,
+  nightModeHotkey: 'Alt+N',
+  coverDownload: true,
+  danmakuExport: true,
 };
+
+/**
+ * 跨天滚动：统一修复"非当天数据"问题。
+ * 任何读写 today* 的端（content / background / popup / options）在落库前都必须先调用本函数，
+ * 确保：若 stats.today 不是今天，则归零今日项并保留累计；并保证 daily 末项始终为今天。
+ * 此前该逻辑仅存在于 background 的 roll()，而 content script 直写 today* 从不滚动，
+ * 导致 SW 休眠跨天后"今天"卡在昨天，F5 唤醒后台才归零。
+ */
+export function rollStats(stats: BiliStats): BiliStats {
+  const today = todayStr();
+  if (stats.today !== today) {
+    // 跨天：把昨日数据落入 daily，今日项归零（累计保留）
+    const daily = (stats.daily ?? []).slice();
+    const yesterday = {
+      date: stats.today,
+      pcdn: stats.todayPcdn,
+      p2pBytes: stats.todayP2pBytes,
+      adRemoved: stats.todayAdRemoved,
+    };
+    const last = daily[daily.length - 1];
+    if (last && last.date === stats.today) daily[daily.length - 1] = yesterday;
+    else daily.push(yesterday);
+    stats = {
+      ...DEFAULT_STATS,
+      today,
+      totalPcdn: stats.totalPcdn,
+      totalP2pCalls: stats.totalP2pCalls,
+      totalP2pBytes: stats.totalP2pBytes,
+      totalAdRemoved: stats.totalAdRemoved,
+      daily,
+    };
+  }
+  // 无论是否跨天，都同步 daily 末项为今天的实时值
+  const daily = (stats.daily ?? []).slice();
+  let last = daily[daily.length - 1];
+  if (!last || last.date !== today) {
+    last = { date: today, pcdn: 0, p2pBytes: 0, adRemoved: 0 };
+    daily.push(last);
+  } else {
+    last = { ...last };
+    daily[daily.length - 1] = last;
+  }
+  last.pcdn = stats.todayPcdn;
+  last.p2pBytes = stats.todayP2pBytes;
+  last.adRemoved = stats.todayAdRemoved;
+  return { ...stats, daily: daily.slice(-7) };
+}
 
 export const DEFAULT_STATS: BiliStats = {
   today: todayStr(),
@@ -132,6 +195,7 @@ export const DEFAULT_STATS: BiliStats = {
   totalP2pBytes: 0,
   totalAdRemoved: 0,
   daily: [],
+  lastP2pBlock: null,
 };
 
 /** 状态快照：popup / options 读取用 */

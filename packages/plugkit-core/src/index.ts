@@ -4,3 +4,5 @@ export * from './messaging';
 export * from './storage';
 export * from './platform';
 export * from './logger';
+export * from './hotkey';
+export * from './toast';

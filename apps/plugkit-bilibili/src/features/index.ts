@@ -7,6 +7,8 @@ import { startPlayerEnhance } from './player-enhance';
 import { startDanmaku } from './danmaku';
 import { startAccountTools } from './account';
 import { startPreciseStats } from './precise-stats';
+import { startNightMode } from './night-mode';
+import { startDownloadTools } from './download';
 
 export async function loadFeatures(): Promise<void> {
   const s = await settingsStore.get();
@@ -15,6 +17,8 @@ export async function loadFeatures(): Promise<void> {
   if (s.danmaku) startDanmaku(s);
   if (s.accountTools) startAccountTools(s);
   if (s.preciseStats) startPreciseStats();
+  startNightMode(s); // 常驻：快捷键可反向打开
+  if (s.coverDownload || s.danmakuExport) startDownloadTools(s);
 }
 
 export type { BiliSettings };

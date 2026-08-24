@@ -7,3 +7,5 @@ export { Button } from './components/Button';
 export { StatCard } from './components/StatCard';
 export { SectionTitle } from './components/SectionTitle';
 export { Badge } from './components/Badge';
+export { Card } from './components/Card';
+export { useChromeStorage, useHotkey } from './hooks';

@@ -2,7 +2,7 @@
 // 由 content.ts(document_start) 加载——必须尽早 hook，故保持独立、精小（不引 React）
 // 统计上报：直写 chrome.storage.local（纯 storage 驱动，不走消息通道）
 import { createStorage } from '@plugkit/core';
-import { BiliSettings, DEFAULT_SETTINGS, DEFAULT_STATS, todayStr } from '../shared/types';
+import { BiliSettings, BiliStats, DEFAULT_SETTINGS, DEFAULT_STATS, rollStats } from '../shared/types';
 
 const STATS_KEY = 'plugkit:bili:stats';
 
@@ -29,11 +29,13 @@ export function startP2pBlocker(): void {
   let timer: number | undefined;
 
   /** 直写 stats storage（读改写合并，失败静默——统计非关键路径） */
-  async function persistStats(update: (stats: Record<string, unknown>) => void): Promise<void> {
+  async function persistStats(update: (stats: BiliStats) => void): Promise<void> {
     try {
       const raw = await chrome.storage.local.get(STATS_KEY);
-      const stats = { ...DEFAULT_STATS, ...(raw[STATS_KEY] ?? {}) } as Record<string, unknown>;
+      let stats = { ...DEFAULT_STATS, ...(raw[STATS_KEY] ?? {}) } as BiliStats;
+      stats = rollStats(stats); // 跨天归零今日项（修复"非当天数据"）
       update(stats);
+      stats = rollStats(stats); // 把最新值同步进 daily 当天项
       await chrome.storage.local.set({ [STATS_KEY]: stats });
     } catch {
       /* 统计写入失败不影响核心拦截 */
@@ -47,20 +49,11 @@ export function startP2pBlocker(): void {
     accBytes = 0;
     accCalls = 0;
     void persistStats((stats) => {
-      stats.todayP2pCalls = (stats.todayP2pCalls as number) + calls;
-      stats.totalP2pCalls = (stats.totalP2pCalls as number) + calls;
-      stats.todayP2pBytes = (stats.todayP2pBytes as number) + bytes;
-      stats.totalP2pBytes = (stats.totalP2pBytes as number) + bytes;
-      // 同步 daily 当天项（无则不补历史，保持简单）
-      const today = todayStr();
-      const daily = ((stats.daily as unknown[]) ?? []).slice();
-      let last = daily[daily.length - 1] as Record<string, unknown> | undefined;
-      if (!last || last.date !== today) {
-        last = { date: today, pcdn: 0, p2pBytes: 0, adRemoved: 0 };
-        daily.push(last);
-      }
-      last.p2pBytes = stats.todayP2pBytes;
-      stats.daily = daily.slice(-7);
+      stats.todayP2pCalls += calls;
+      stats.totalP2pCalls += calls;
+      stats.todayP2pBytes += bytes;
+      stats.totalP2pBytes += bytes;
+      stats.lastP2pBlock = Date.now(); // 记录最近一次成功拦截，供 UI 展示（可验证性）
     });
   };
 

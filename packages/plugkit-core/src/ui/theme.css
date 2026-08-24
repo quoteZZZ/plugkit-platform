@@ -55,6 +55,38 @@ body {
   box-shadow: var(--pk-shadow);
   padding: 12px 14px;
 }
+.plugkit-card-head { margin-bottom: 8px; }
+.plugkit-card-title { font-size: 13px; font-weight: 700; color: var(--pk-text); }
+.plugkit-card-sub { font-size: 11px; color: var(--pk-text-muted); margin-top: 2px; }
+
+/* Toast 轻提示 */
+.plugkit-toast-host {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2147483647;
+  pointer-events: none;
+}
+.plugkit-toast {
+  max-width: 280px;
+  padding: 8px 14px;
+  border-radius: var(--pk-radius-sm);
+  font-size: 13px;
+  font-family: var(--pk-font);
+  color: #fff;
+  background: #1f2328;
+  box-shadow: var(--pk-shadow);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.plugkit-toast-show { opacity: 1; transform: translateY(0); }
+.plugkit-toast-success { background: var(--pk-success); }
+.plugkit-toast-error { background: var(--pk-danger); }
+.plugkit-toast-info { background: var(--pk-accent); }
 
 .plugkit-section-title {
   display: flex;
