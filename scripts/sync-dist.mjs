@@ -38,9 +38,9 @@ for (const appName of appNames) {
     continue;
   }
 
-  // 清空目标（保留 .git），再整体复制，避免残留旧文件
+  // 清空目标（保留 .git / .gitignore），再整体复制，避免残留旧文件
   for (const entry of await readdir(dest)) {
-    if (entry === '.git') continue;
+    if (entry === '.git' || entry === '.gitignore') continue;
     await rm(join(dest, entry), { recursive: true, force: true });
   }
   await cp(outputDir, dest, { recursive: true });
