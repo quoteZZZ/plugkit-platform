@@ -14,32 +14,16 @@ import { fmtBytes } from '../../shared/format';
 const SETTINGS_KEY = 'plugkit:bili:settings';
 const STATS_KEY = 'plugkit:bili:stats';
 
-/** 昨日日期 yyyy-mm-dd（用于"较昨日"对比） */
-function yesterdayStr(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate(),
-  ).padStart(2, '0')}`;
-}
-
-/** 带"较昨日"对比的紧凑统计块（趋势图已移除，对比信息承载"看变化"需求） */
+/** 紧凑统计块（仅展示今日数值 + 累计，无对比） */
 function MiniStat({
   label,
   value,
-  delta,
   sub,
 }: {
   label: string;
   value: string;
-  delta?: number;
   sub?: string;
 }) {
-  const d = delta ?? 0;
-  const tone =
-    d > 0 ? 'var(--pk-accent)' : d < 0 ? 'var(--pk-text-secondary)' : 'var(--pk-text-muted)';
-  const arrow = d > 0 ? '▲' : d < 0 ? '▼' : '—';
-  const deltaText = d === 0 ? '持平' : `${d > 0 ? '+' : '-'}${Math.abs(d)}`;
   return (
     <div
       style={{
@@ -52,9 +36,6 @@ function MiniStat({
     >
       <div style={{ fontSize: 11, color: 'var(--pk-text-secondary)' }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2, whiteSpace: 'nowrap' }}>{value}</div>
-      <div style={{ fontSize: 10, marginTop: 1, whiteSpace: 'nowrap', color: tone }}>
-        {arrow} 较昨日 {deltaText}
-      </div>
       {sub && (
         <div
           style={{
@@ -167,7 +148,6 @@ function App() {
 
   const { stats, settings, todayEstimatedMB, bgErrors } = snap;
   const running = settings.masterOn;
-  const y = stats.daily.find((x) => x.date === yesterdayStr());
 
   return (
     <Popup>
@@ -202,24 +182,21 @@ function App() {
         </div>
       )}
 
-      {/* 段1 · 今日概览（带较昨日对比） */}
+      {/* 段1 · 今日概览 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         <MiniStat
           label="PCDN 拦截"
           value={String(stats.todayPcdn)}
-          delta={stats.todayPcdn - (y?.pcdn ?? 0)}
           sub={`累计 ${stats.totalPcdn}`}
         />
         <MiniStat
           label="阻止上传"
           value={fmtBytes(stats.todayP2pBytes)}
-          delta={stats.todayP2pBytes - (y?.p2pBytes ?? 0)}
           sub={`${stats.todayP2pCalls} 次`}
         />
         <MiniStat
           label="清理广告"
           value={String(stats.todayAdRemoved)}
-          delta={stats.todayAdRemoved - (y?.adRemoved ?? 0)}
           sub={`累计 ${stats.totalAdRemoved}`}
         />
       </div>

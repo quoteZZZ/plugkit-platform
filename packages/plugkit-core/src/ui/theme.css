@@ -333,3 +333,21 @@ body {
 .plugkit-log-time { color: #8c959f; flex-shrink: 0; }
 .plugkit-log-level { flex-shrink: 0; width: 42px; font-weight: 700; text-transform: uppercase; }
 .plugkit-log-msg { color: #e6edf3; }
+
+/* 通用等宽网格（弹窗概览卡：统计/状态并排） */
+.plugkit-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.plugkit-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+@media (max-width: 300px) {
+  .plugkit-grid-2,
+  .plugkit-grid-3 { grid-template-columns: 1fr; }
+}
