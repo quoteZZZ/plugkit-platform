@@ -1,10 +1,10 @@
 // feature: 直播 P2P(WebRTC DataChannel) 上传阻止
 // 由 content.ts(document_start) 加载——必须尽早 hook，故保持独立、精小（不引 React）
-// 统计上报：直写 chrome.storage.local（纯 storage 驱动，不走消息通道）
+// 统计：只往 stats-bus 的 window 缓冲累加，落库交给唯一写者（flushStats），
+//       避免与 ad-clean 并发「读-改-写」chrome.storage 时互相覆盖丢计数。
 import { createStorage } from '@plugkit/core';
-import { BiliSettings, BiliStats, DEFAULT_SETTINGS, DEFAULT_STATS, rollStats } from '../shared/types';
-
-const STATS_KEY = 'plugkit:bili:stats';
+import { BiliSettings, DEFAULT_SETTINGS } from '../shared/types';
+import { bumpDelta, flushStats } from './stats-bus';
 
 export function startP2pBlocker(): void {
   const settingsStore = createStorage<BiliSettings>('bili:settings', DEFAULT_SETTINGS);
@@ -28,33 +28,15 @@ export function startP2pBlocker(): void {
   let accCalls = 0;
   let timer: number | undefined;
 
-  /** 直写 stats storage（读改写合并，失败静默——统计非关键路径） */
-  async function persistStats(update: (stats: BiliStats) => void): Promise<void> {
-    try {
-      const raw = await chrome.storage.local.get(STATS_KEY);
-      let stats = { ...DEFAULT_STATS, ...(raw[STATS_KEY] ?? {}) } as BiliStats;
-      stats = rollStats(stats); // 跨天归零今日项（修复"非当天数据"）
-      update(stats);
-      stats = rollStats(stats); // 把最新值同步进 daily 当天项
-      await chrome.storage.local.set({ [STATS_KEY]: stats });
-    } catch {
-      /* 统计写入失败不影响核心拦截 */
-    }
-  }
-
   const flush = () => {
     if (accCalls === 0) return;
     const bytes = accBytes;
     const calls = accCalls;
     accBytes = 0;
     accCalls = 0;
-    void persistStats((stats) => {
-      stats.todayP2pCalls += calls;
-      stats.totalP2pCalls += calls;
-      stats.todayP2pBytes += bytes;
-      stats.totalP2pBytes += bytes;
-      stats.lastP2pBlock = Date.now(); // 记录最近一次成功拦截，供 UI 展示（可验证性）
-    });
+    // 先入缓冲（同步、不会丢），再触发落库
+    bumpDelta({ p2pBytes: bytes, p2pCalls: calls }, Date.now());
+    void flushStats();
   };
 
   proto.send = function (
@@ -79,4 +61,7 @@ export function startP2pBlocker(): void {
       }, 5000);
     }
   } as typeof proto.send;
+
+  // 关页面/切走前把残余计数刷掉（直播页常被直接关闭，不刷会丢最后 5 秒的计数）
+  window.addEventListener('pagehide', flush);
 }

@@ -6,13 +6,7 @@ import type { LogEntry, LogLevel } from '@plugkit/core';
 import { LogPanel } from '../../components/LogPanel';
 import { settingsStore, type HubSettings } from '../../shared/types';
 import { fetchLogs, clearLogsFor } from '../../shared/hub';
-
-interface ManagedPlugin {
-  id: string;
-  name: string;
-  displayName?: string;
-  isSelf: boolean;
-}
+import { discoverPlugins, type ManagedPlugin } from '../../shared/discover';
 
 function App() {
   const selfId = browser.runtime.id;
@@ -36,26 +30,9 @@ function App() {
     setRefreshInput(String(s.refreshSeconds));
     setMaxLogsInput(String(s.maxLogs));
 
-    const all = await browser.management.getAll();
-    const managed: ManagedPlugin[] = (all as any[])
-      .filter(
-        (e: any) =>
-          e.manifest?.plugkit?.suite === 'plugkit' ||
-          (typeof e.name === 'string' && e.name.startsWith('PlugKit')),
-      )
-      .map((e: any) => ({
-        id: e.id,
-        name: e.name,
-        displayName: e.manifest?.plugkit?.displayName ?? e.name,
-        isSelf: e.id === selfId,
-      }))
-      // 排序：本平台（自身）置顶，其余按显示名
-      .sort((a, b) => {
-        if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
-        return (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name);
-      });
-    setPlugins(managed);
-    setLogTarget((prev) => prev || managed[0]?.id || '');
+    const all = await discoverPlugins(selfId);
+    setPlugins(all);
+    setLogTarget((prev) => prev || all[0]?.id || '');
   }, [selfId]);
 
   React.useEffect(() => {
@@ -122,10 +99,6 @@ function App() {
 
   return (
     <OptionsPage title="插件平台 · 设置">
-      <p className="subtitle">
-        集中管理 PlugKit 系列插件：列表总览、开关、日志监测——以下为插件平台自身的偏好设置。
-      </p>
-
       <Card title="⚙️ 列表与刷新">
         <Toggle
           label="列表中显示自身（管理平台）"
@@ -174,18 +147,6 @@ function App() {
           {maxLogsErr && (
             <span style={{ fontSize: 12, color: 'var(--pk-danger)', width: '100%' }}>{maxLogsErr}</span>
           )}
-        </Field>
-        <Field label="最低级别">
-          <select
-            className="plugkit-input"
-            value={settings.minLogLevel}
-            onChange={(e) => update({ minLogLevel: e.target.value as LogLevel })}
-          >
-            <option value="debug">debug</option>
-            <option value="info">info</option>
-            <option value="warn">warn</option>
-            <option value="error">error</option>
-          </select>
         </Field>
       </Card>
 

@@ -1,11 +1,9 @@
 // feature: 页面广告净化——移除 B 站页面中的广告/推广元素
 // 策略：MutationObserver 增量检查新增节点（选择器命中 + 文本关键词双重判断），
 // 另加低频选择器兜底扫描（SPA 切换页面）。误删防护：不碰播放器区域/视频。
-// 统计上报：直写 chrome.storage.local（纯 storage 驱动，不走消息通道）
-import { BiliStats, DEFAULT_STATS, rollStats } from '../shared/types';
+// 统计：只往 stats-bus 缓冲累加，落库交给唯一写者（flushStats）。
+import { bumpDelta, flushStats } from './stats-bus';
 import { elText } from './util';
-
-const STATS_KEY = 'plugkit:bili:stats';
 
 /** 已知广告/推广元素选择器（B 站改版可能失效，靠关键词兜底） */
 const AD_SELECTORS = [
@@ -21,25 +19,12 @@ const AD_PATTERNS = [/^广告/, /^推广/, /^赞助/, /^精选/];
 
 let pending = 0;
 
-async function persistAdCount(count: number): Promise<void> {
-  try {
-    const raw = await chrome.storage.local.get(STATS_KEY);
-    let stats = { ...DEFAULT_STATS, ...(raw[STATS_KEY] ?? {}) } as BiliStats;
-    stats = rollStats(stats); // 跨天归零今日项（修复"非当天数据"）
-    stats.todayAdRemoved += count;
-    stats.totalAdRemoved += count;
-    stats = rollStats(stats); // 把最新值同步进 daily 当天项
-    await chrome.storage.local.set({ [STATS_KEY]: stats });
-  } catch {
-    /* 统计写入失败不影响净化功能 */
-  }
-}
-
-function flush() {
+function flush(): void {
   if (pending === 0) return;
   const count = pending;
   pending = 0;
-  void persistAdCount(count);
+  bumpDelta({ adRemoved: count });
+  void flushStats();
 }
 
 function remove(el: Element): boolean {
@@ -52,8 +37,18 @@ function remove(el: Element): boolean {
   return true;
 }
 
-function matchesSelector(el: Element): boolean {
-  return AD_SELECTORS.some((sel) => el.matches(sel));
+/**
+ * 向上最多 3 层找广告容器。
+ * 之所以要看祖先：广告卡片通常是容器先插入、内部文字后填充，命中时新增的只是子节点。
+ * 限制 3 层是为了避免 closest 一路兜到页面级大容器、误删整块内容。
+ */
+function closestAd(el: Element): Element | null {
+  let cur: Element | null = el;
+  for (let depth = 0; cur && depth < 3; depth += 1) {
+    if (AD_SELECTORS.some((sel) => cur!.matches(sel))) return cur;
+    cur = cur.parentElement;
+  }
+  return null;
 }
 
 function matchesKeyword(el: Element): boolean {
@@ -63,8 +58,9 @@ function matchesKeyword(el: Element): boolean {
 }
 
 function checkNode(el: Element): void {
-  if (matchesSelector(el)) {
-    remove(el);
+  const holder = closestAd(el);
+  if (holder) {
+    remove(holder);
     return;
   }
   // 文本关键词判断只针对小卡片（div/a/span），避免误伤容器
@@ -77,11 +73,10 @@ export function startAdClean(): void {
   const observer = new MutationObserver((mutations) => {
     for (const m of mutations) {
       for (const node of m.addedNodes) {
-        if (!(node instanceof Element)) continue;
-        checkNode(node);
-        // 新增容器内的子元素也可能含广告
-        const children = node.querySelectorAll('div, a, span');
-        for (const child of children) checkNode(child);
+        if (node instanceof Element) checkNode(node);
+        // 后代节点无需在此递归查询：subtree 观察器会为每个后代单独派发 addedNodes。
+        // 旧实现在这里对每个新增节点再跑一次 querySelectorAll('div,a,span')，
+        // 首页一次性插入上百节点时是 O(n²) 的同步 DOM 查询，会明显拖慢首屏。
       }
     }
   });
@@ -94,6 +89,7 @@ export function startAdClean(): void {
     }
   }, 10_000);
 
-  // 每 20 秒上报一次计数
-  setInterval(() => flush(), 20_000);
+  // 每 20 秒上报一次计数（合并进 stats-bus，由统一写者落库）
+  setInterval(flush, 20_000);
+  window.addEventListener('pagehide', flush);
 }

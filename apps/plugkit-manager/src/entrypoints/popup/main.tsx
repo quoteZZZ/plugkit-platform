@@ -3,20 +3,15 @@ import { createRoot } from 'react-dom/client';
 import { browser } from 'wxt/browser';
 import { Popup, Toggle, Badge, Button } from '@plugkit/core/ui';
 import { settingsStore, type HubSettings } from '../../shared/types';
+import { discoverPlugins, setEnabledBulk, type ManagedPlugin } from '../../shared/discover';
 
-interface ManagedPlugin {
-  id: string;
-  name: string;
-  version: string;
-  enabled: boolean;
-  iconUrl?: string;
-  optionsUrl?: string;
-  displayName?: string;
-  category?: string;
-  description?: string;
-  homepageUrl?: string;
-  isSelf: boolean;
-}
+const FILTERS = [
+  { key: 'all', label: '全部' },
+  { key: 'on', label: '已启用' },
+  { key: 'off', label: '已停用' },
+] as const;
+
+type FilterKey = (typeof FILTERS)[number]['key'];
 
 /** 插件卡片：插件中心风格，每个插件独立成卡 */
 function PluginCard(props: {
@@ -50,13 +45,13 @@ function PluginCard(props: {
               flexShrink: 0,
             }}
           >
-            {(p.displayName ?? p.name).slice(0, 1)}
+            {p.displayName.slice(0, 1)}
           </div>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
             <span
-              title={p.displayName ?? p.name}
+              title={p.displayName}
               style={{
                 fontWeight: 600,
                 fontSize: 13,
@@ -65,12 +60,12 @@ function PluginCard(props: {
                 textOverflow: 'ellipsis',
               }}
             >
-              {p.displayName ?? p.name}
+              {p.displayName}
             </span>
             <Badge tone="muted" style={{ flexShrink: 0 }}>v{p.version}</Badge>
           </div>
           <div style={{ marginTop: 3, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            <Badge tone="accent">{p.category ?? 'PlugKit'}</Badge>
+            <Badge tone="accent">{p.category}</Badge>
             {p.isSelf && <Badge tone="success">本插件</Badge>}
           </div>
         </div>
@@ -97,8 +92,8 @@ function PluginCard(props: {
             {p.isSelf ? '设置' : '配置'}
           </Button>
         )}
-        {!p.isSelf && (
-          confirming ? (
+        {!p.isSelf &&
+          (confirming ? (
             <span style={{ fontSize: 12, color: 'var(--pk-danger)' }}>确认卸载？</span>
           ) : (
             <Button
@@ -108,8 +103,7 @@ function PluginCard(props: {
             >
               卸载
             </Button>
-          )
-        )}
+          ))}
         {confirming && !p.isSelf && (
           <>
             <Button
@@ -122,10 +116,7 @@ function PluginCard(props: {
             >
               确认
             </Button>
-            <Button
-              onClick={() => setConfirming(false)}
-              style={{ padding: '3px 10px', fontSize: 12 }}
-            >
+            <Button onClick={() => setConfirming(false)} style={{ padding: '3px 10px', fontSize: 12 }}>
               取消
             </Button>
           </>
@@ -174,38 +165,15 @@ function App() {
   const [plugins, setPlugins] = React.useState<ManagedPlugin[]>([]);
   const [settings, setSettings] = React.useState<HubSettings>(settingsStore.defaults);
   const [keyword, setKeyword] = React.useState('');
+  const [filter, setFilter] = React.useState<FilterKey>('all');
   const [error, setError] = React.useState('');
+  /** 单次操作失败提示（批量/开关/卸载），与列表读取错误分开显示 */
+  const [actionError, setActionError] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
 
   const reload = React.useCallback(async () => {
     try {
-      const all = await browser.management.getAll();
-      // 识别：Chrome 的 management API 会剥离 manifest 自定义字段（plugkit 读不到），
-      // 因此用标准字段 name 前缀兜底——PlugKit 系列插件 name 均以 "PlugKit" 开头
-      const managed: ManagedPlugin[] = (all as any[])
-        .filter(
-          (e: any) =>
-            e.manifest?.plugkit?.suite === 'plugkit' ||
-            (typeof e.name === 'string' && e.name.startsWith('PlugKit')),
-        )
-        .map((e: any) => ({
-          id: e.id,
-          name: e.name,
-          version: e.version,
-          enabled: e.enabled,
-          iconUrl: e.icons?.[e.icons.length - 1]?.url,
-          optionsUrl: e.optionsUrl,
-          displayName: e.manifest?.plugkit?.displayName ?? e.name,
-          category: e.manifest?.plugkit?.category ?? 'PlugKit',
-          description: e.description,
-          homepageUrl: e.homepageUrl,
-          isSelf: e.id === selfId,
-        }))
-        // 排序：本平台（自身）置顶，其余按显示名
-        .sort((a, b) => {
-          if (a.isSelf !== b.isSelf) return a.isSelf ? -1 : 1;
-          return (a.displayName ?? a.name).localeCompare(b.displayName ?? b.name);
-        });
-      setPlugins(managed);
+      setPlugins(await discoverPlugins(selfId));
       setError('');
     } catch (e) {
       setError(String(e));
@@ -229,9 +197,15 @@ function App() {
   }, [settings.autoRefresh, settings.refreshSeconds, reload]);
 
   const onToggle = async (p: ManagedPlugin, enabled: boolean) => {
-    await browser.management.setEnabled(p.id, enabled);
-    reload();
+    try {
+      await browser.management.setEnabled(p.id, enabled);
+      setActionError('');
+    } catch (e) {
+      setActionError(`${p.displayName}：${String(e)}`);
+    }
+    await reload();
   };
+
   const onOpen = (p: ManagedPlugin) => {
     if (p.isSelf) {
       void browser.runtime.openOptionsPage();
@@ -239,22 +213,51 @@ function App() {
       void browser.tabs.create({ url: p.optionsUrl });
     }
   };
+
   const onUninstall = async (p: ManagedPlugin) => {
     // 二次确认已在卡片内完成（confirm 在 MV3 popup 被禁用，UI 提供内联确认）
-    await browser.management.uninstall(p.id);
-    reload();
+    try {
+      await browser.management.uninstall(p.id);
+      setActionError('');
+    } catch (e) {
+      setActionError(`${p.displayName}：${String(e)}`);
+    }
+    await reload();
   };
 
+  /** 批量启用/停用：作用于当前筛选+搜索命中的插件（排除自身） */
+  const onBulk = async (enabled: boolean) => {
+    const targets = visible.filter((p) => !p.isSelf);
+    if (targets.length === 0 || busy) return;
+    setBusy(true);
+    setActionError('');
+    try {
+      const { ok, failed } = await setEnabledBulk(targets, enabled);
+      if (failed.length > 0) {
+        setActionError(`${failed.length} 个失败：${failed[0].name}（${failed[0].err}）`);
+      } else if (ok > 0) {
+        setActionError('');
+      }
+      await reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const enabledCount = plugins.filter((p) => p.enabled).length;
   const kw = keyword.trim().toLowerCase();
   const visible = plugins.filter((p) => {
     if (!settings.showSelf && p.isSelf) return false;
+    if (filter === 'on' && !p.enabled) return false;
+    if (filter === 'off' && p.enabled) return false;
     if (!kw) return true;
     return (
-      (p.displayName ?? p.name).toLowerCase().includes(kw) ||
-      (p.name ?? '').toLowerCase().includes(kw)
+      p.displayName.toLowerCase().includes(kw) ||
+      p.name.toLowerCase().includes(kw) ||
+      p.id.toLowerCase().includes(kw)
     );
   });
-  const enabledCount = plugins.filter((p) => p.enabled).length;
+  const bulkTargets = visible.filter((p) => !p.isSelf);
 
   return (
     <Popup>
@@ -303,10 +306,6 @@ function App() {
       {!error && plugins.length === 0 && (
         <div className="plugkit-card" style={{ marginTop: 10 }}>
           <div className="pk-stat-label">未发现 PlugKit 系列插件</div>
-          <p style={{ fontSize: 12, color: '#57606a', lineHeight: 1.7, margin: '6px 0 0' }}>
-            系列插件（名称以 PlugKit 开头，或 manifest 含 plugkit.suite="plugkit"）安装后会自动出现在这里。
-            用 <code>pnpm create-plugkit</code> 生成的新插件即自动接入。
-          </p>
         </div>
       )}
 
@@ -319,19 +318,86 @@ function App() {
             onChange={(e) => setKeyword(e.target.value)}
             style={{ marginTop: 10 }}
           />
-          <div style={{ marginTop: 4 }}>
+
+          {/* 状态筛选 */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            {FILTERS.map((f) => {
+              const count =
+                f.key === 'all' ? plugins.length : f.key === 'on' ? enabledCount : plugins.length - enabledCount;
+              const active = filter === f.key;
+              return (
+                <Button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    padding: '4px 8px',
+                    fontSize: 12,
+                    ...(active
+                      ? {
+                          borderColor: 'var(--pk-accent)',
+                          color: 'var(--pk-accent)',
+                          background: 'var(--pk-accent-weak)',
+                          fontWeight: 600,
+                        }
+                      : null),
+                  }}
+                >
+                  {f.label} {count}
+                </Button>
+              );
+            })}
+          </div>
+
+          {/* 批量开关：只作用于当前命中的插件，自身不参与 */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <Button
+              onClick={() => void onBulk(true)}
+              disabled={busy || bulkTargets.every((p) => p.enabled)}
+              style={{ flex: 1, justifyContent: 'center', padding: '4px 8px', fontSize: 12 }}
+            >
+              启用全部
+            </Button>
+            <Button
+              onClick={() => void onBulk(false)}
+              disabled={busy || bulkTargets.every((p) => !p.enabled)}
+              style={{ flex: 1, justifyContent: 'center', padding: '4px 8px', fontSize: 12 }}
+            >
+              停用全部
+            </Button>
+          </div>
+
+          {actionError && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: '4px 10px',
+                borderRadius: 8,
+                background: 'var(--pk-danger-weak)',
+                border: '1px solid var(--pk-danger)',
+                color: 'var(--pk-danger)',
+                fontSize: 11,
+                wordBreak: 'break-all',
+              }}
+            >
+              {actionError}
+            </div>
+          )}
+
+          <div style={{ marginTop: 8 }}>
             {visible.map((p) => (
               <PluginCard
                 key={p.id}
                 p={p}
-                onToggle={(v) => onToggle(p, v)}
+                onToggle={(v) => void onToggle(p, v)}
                 onOpen={() => onOpen(p)}
-                onUninstall={() => onUninstall(p)}
+                onUninstall={() => void onUninstall(p)}
               />
             ))}
             {visible.length === 0 && (
-              <div className="pk-stat-sub" style={{ padding: '12px 0' }}>
-                没有匹配「{keyword}」的插件
+              <div className="pk-stat-sub" style={{ padding: '12px 0', textAlign: 'center' }}>
+                无匹配结果
               </div>
             )}
           </div>

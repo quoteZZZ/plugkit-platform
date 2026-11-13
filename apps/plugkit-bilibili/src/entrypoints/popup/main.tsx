@@ -8,6 +8,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_STATS,
   rollStats,
+  todayStr,
 } from '../../shared/types';
 import { fmtBytes } from '../../shared/format';
 

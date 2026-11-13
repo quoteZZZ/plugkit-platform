@@ -16,14 +16,17 @@
     "category": "工具"
   }
   ```
-- **平台过滤逻辑**：
+- **平台过滤逻辑**（实现集中在 `src/shared/discover.ts`，popup 与 options 共用）：
   ```ts
   const all = await browser.management.getAll();
   const managed = all.filter(
-    (ext) => (ext.manifest as any)?.plugkit?.suite === 'plugkit'
+    (ext) =>
+      (ext.manifest as any)?.plugkit?.suite === 'plugkit' ||
+      ext.name.startsWith('PlugKit'), // 名称前缀兜底
   );
   ```
-- `chrome.management` 返回的 `ExtensionInfo.manifest` 是安装时的完整 manifest 对象，未知字段（如 `plugkit`）会被保留，可直接读取。
+- `chrome.management` 返回的 `ExtensionInfo.manifest` 是安装时的 manifest 副本。**实测部分 Chrome 版本会剥离未知字段**（`plugkit` 读不到），因此实现保留「名称以 `PlugKit` 开头」作为第二条识别通道。
+- 由此得到一条**命名硬约束**：被管理插件的 `manifest.name` 必须以 `PlugKit` 开头，否则在读取不到自定义字段的浏览器上不会被列出。新建插件请用 `pnpm create-plugkit`，它已遵循该约定。
 
 ## 2. 被管理插件最小接口（对接规范）
 
@@ -44,6 +47,7 @@
 |---------|---------|------|
 | 列表总览 | `management.ExtensionInfo` | `name`, `version`, `enabled`, `icons`, `plugkit.displayName`, `plugkit.category` |
 | 启用/禁用 | `management.setEnabled(id, bool)` | — |
+| 批量启用/停用 | 逐个调用 `management.setEnabled`，作用于当前筛选/搜索命中的插件，**跳过平台自身**（禁用自己会导致 popup 消失且无恢复入口） | — |
 | 打开配置 | `management.get(id).optionsUrl` | `optionsUrl` |
 | 卸载 | `management.uninstall(id)` | — |
 

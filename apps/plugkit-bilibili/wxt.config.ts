@@ -11,7 +11,8 @@ export default defineConfig({
     version: '0.2.9',
     // 显式声明：允许所有扩展连接，确保 plugkit-manager 能跨插件拉取日志（与默认行为一致但更明确）
     externally_connectable: { ids: ['*'] },
-    permissions: ['declarativeNetRequest', 'webRequest', 'storage', 'alarms'],
+    // downloads：视频直链交给下载管理器落盘，避免整段读进页面内存
+    permissions: ['declarativeNetRequest', 'webRequest', 'storage', 'alarms', 'downloads'],
     host_permissions: [
       '*://*.bilibili.com/*',
       '*://*.bilivideo.cn/*',

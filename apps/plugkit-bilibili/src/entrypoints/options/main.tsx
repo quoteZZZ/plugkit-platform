@@ -19,6 +19,8 @@ function App() {
   const [error, setError] = React.useState('');
   const [chunkInput, setChunkInput] = React.useState('2');
   const [speedInput, setSpeedInput] = React.useState('1');
+  /** 弹幕透明度：拖动期间只改本地，松手才落库（避免每格一次 storage 写入 + 页面重排） */
+  const [opacityInput, setOpacityInput] = React.useState(100);
   const [hotkeyInput, setHotkeyInput] = React.useState('Alt+D');
   const [nightHotkeyInput, setNightHotkeyInput] = React.useState('Alt+N');
   const [allowlistInput, setAllowlistInput] = React.useState('');
@@ -38,6 +40,7 @@ function App() {
       if (init) {
         setChunkInput(String(settings.avgChunkMB));
         setSpeedInput(String(settings.customSpeed));
+        setOpacityInput(settings.danmakuOpacity);
         setHotkeyInput(settings.danmakuHotkey);
         setNightHotkeyInput(settings.nightModeHotkey);
         setAllowlistInput((settings.pcdnAllowlist ?? []).join(', '));
@@ -241,11 +244,13 @@ function App() {
             type="range"
             min={10}
             max={100}
-            value={settings.danmakuOpacity}
-            onChange={(e) => onToggle({ danmakuOpacity: Number(e.target.value) })}
+            value={opacityInput}
+            onChange={(e) => setOpacityInput(Number(e.target.value))}
+            onPointerUp={() => void onToggle({ danmakuOpacity: opacityInput })}
+            onKeyUp={() => void onToggle({ danmakuOpacity: opacityInput })}
             style={{ width: 160, verticalAlign: 'middle' }}
           />
-          <span style={{ marginLeft: 8 }}>{settings.danmakuOpacity}%</span>
+          <span style={{ marginLeft: 8 }}>{opacityInput}%</span>
         </Field>
         <p className="pk-stat-sub" style={{ margin: '4px 0 0' }}>
           屏蔽词/字号过滤需拦截弹幕 protobuf 接口，本期后置；透明度对所有弹幕模式生效。

@@ -10,11 +10,21 @@ import {
   createStorage,
   getLogs,
   onExternalMessage,
+  onMessage,
   PLUGKIT_CLEAR_LOGS_CHANNEL,
   PLUGKIT_STATUS_CHANNEL,
 } from '@plugkit/core';
 import { BiliSettings, BiliStats, DEFAULT_SETTINGS, DEFAULT_STATS, rollStats } from '../shared/types';
 import { matchesPcdn, WEB_REQUEST_FILTER } from '../shared/rules';
+
+/** 内部消息通道：content 请求后台用 chrome.downloads 落盘 */
+const DOWNLOAD_CHANNEL = 'bili/download';
+
+/** 「给视频 CDN 补 Referer」动态规则 id（与白名单规则的 9000 段错开） */
+const REFERER_RULE_ID = 9100;
+
+/** 需要补 Referer 的媒体域（必须被 host_permissions 覆盖） */
+const MEDIA_DOMAINS = ['bilivideo.com', 'bilivideo.cn'];
 
 export default defineBackground(() => {
   const logger = createLogger('bili-bg');
@@ -81,19 +91,71 @@ export default defineBackground(() => {
       const removeRuleIds = existing
         .map((r) => r.id)
         .filter((id) => id >= ALLOW_RULE_BASE);
-      const addRules = clean.map((d, i) => ({
-        id: ALLOW_RULE_BASE + i,
-        priority: 100,
-        action: { type: 'allow' as const },
-        condition: {
-          urlFilter: `||${d}`,
-          resourceTypes: ['xmlhttprequest', 'media', 'websocket', 'other', 'ping'] as const,
-        },
-      }));
+      // 显式标注 Rule 类型：`as const` 会把 resourceTypes 收窄成只读元组，与 Rule[] 不兼容
+      const addRules = clean.map(
+        (d, i): chrome.declarativeNetRequest.Rule => ({
+          id: ALLOW_RULE_BASE + i,
+          priority: 100,
+          action: { type: 'allow' as chrome.declarativeNetRequest.RuleActionType },
+          condition: {
+            urlFilter: `||${d}`,
+            resourceTypes: [
+              'xmlhttprequest',
+              'media',
+              'websocket',
+              'other',
+              'ping',
+            ] as chrome.declarativeNetRequest.ResourceType[],
+          },
+        }),
+      );
       await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds, addRules });
       if (clean.length > 0) logger.info(`白名单已同步：${clean.join(', ')}`);
     } catch (e) {
       recordError('同步白名单', e);
+    }
+  }
+
+  /**
+   * 给视频 CDN 请求补 Referer。
+   * chrome.downloads 发起的请求不带 Referer，而 bilivideo 会校验它——不补就是 403。
+   * 仅在「下载视频」开启时启用，避免给不需要下载的用户平白多改请求头。
+   */
+  async function syncRefererRule(on: boolean): Promise<void> {
+    try {
+      const existing = await chrome.declarativeNetRequest.getDynamicRules().catch(() => []);
+      const has = existing.some((r) => r.id === REFERER_RULE_ID);
+      if (on === has) return; // 幂等：状态没变就不动规则表
+      const addRules = on
+        ? ([
+            {
+              id: REFERER_RULE_ID,
+              priority: 10,
+              action: {
+                type: 'modifyHeaders',
+                requestHeaders: [
+                  {
+                    header: 'referer',
+                    operation: 'set',
+                    value: 'https://www.bilibili.com/',
+                  },
+                  { header: 'origin', operation: 'set', value: 'https://www.bilibili.com' },
+                ],
+              },
+              condition: {
+                requestDomains: MEDIA_DOMAINS,
+                resourceTypes: ['media', 'xmlhttprequest', 'other'],
+              },
+            },
+          ] as unknown as chrome.declarativeNetRequest.Rule[])
+        : [];
+      await chrome.declarativeNetRequest.updateDynamicRules({
+        removeRuleIds: has ? [REFERER_RULE_ID] : [],
+        addRules,
+      });
+      logger.info(`CDN Referer 补偿：${on ? '已启用' : '已关闭'}`);
+    } catch (e) {
+      recordError('同步 Referer 规则', e);
     }
   }
 
@@ -119,6 +181,8 @@ export default defineBackground(() => {
     }
     // 白名单与规则集同步
     await syncAllowlist(s.pcdnAllowlist);
+    // 下载视频开启时才给 CDN 补 Referer（chrome.downloads 不带 Referer 会被 CDN 403）
+    await syncRefererRule(s.videoDownload);
   }
 
   /** 每日签到（保守版：仅签到接口，不动投币/分享） */
@@ -204,6 +268,30 @@ export default defineBackground(() => {
         });
       }
     });
+  });
+
+  // —— 下载桥：content 把直链交过来，由下载管理器落盘（不占页面内存）——
+  safeRegister('downloadBridge', () => {
+    onMessage<{ url: string; filename: string }, { ok: boolean; err?: string }>(
+      DOWNLOAD_CHANNEL,
+      async (req) => {
+        try {
+          if (!req?.url) return { ok: false, err: '缺少下载地址' };
+          const id = await chrome.downloads.download({
+            url: req.url,
+            filename: req.filename || 'bilibili.mp4',
+            saveAs: false,
+            conflictAction: 'uniquify',
+          });
+          if (typeof id !== 'number') return { ok: false, err: '下载器未返回任务 id' };
+          logger.info('已加入下载', req.filename);
+          return { ok: true };
+        } catch (e) {
+          recordError('下载', e);
+          return { ok: false, err: String(e) };
+        }
+      },
+    );
   });
 
   // —— 跨插件状态桥：供 plugkit-manager 拉取本插件日志（保留跨插件消息，管理平台依赖）——
