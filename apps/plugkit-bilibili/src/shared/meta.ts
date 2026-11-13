@@ -1,12 +1,11 @@
 // 视频元信息（isolated world 侧）。
-// 数据由 meta.content.ts 在 MAIN world 读取后 postMessage 过来——content script 读不到
-// 页面主世界的 window.__INITIAL_STATE__，直接读会恒为 undefined。
+// 数据由 page-bridge.content.ts 在 MAIN world 读取后 postMessage 过来——content script
+// 读不到页面主世界的 window.__INITIAL_STATE__，直接读会恒为 undefined。
 export interface BiliVideoMeta {
   bvid?: string;
   cid?: number;
   title?: string;
   pic?: string;
-  ownerLocation?: string;
   stat?: Record<string, number>;
 }
 

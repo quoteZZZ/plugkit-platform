@@ -15,16 +15,8 @@ import { fmtBytes } from '../../shared/format';
 const SETTINGS_KEY = 'plugkit:bili:settings';
 const STATS_KEY = 'plugkit:bili:stats';
 
-/** 紧凑统计块（仅展示今日数值 + 累计，无对比） */
-function MiniStat({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-}) {
+/** 紧凑统计块：只放实测值，不做估算 */
+function MiniStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div
       style={{
@@ -36,7 +28,7 @@ function MiniStat({
       }}
     >
       <div style={{ fontSize: 11, color: 'var(--pk-text-secondary)' }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, marginTop: 2, whiteSpace: 'nowrap' }}>{value}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginTop: 2, whiteSpace: 'nowrap' }}>{value}</div>
       {sub && (
         <div
           style={{
@@ -59,7 +51,6 @@ function App() {
   const [snap, setSnap] = React.useState<{
     stats: BiliStats;
     settings: BiliSettings;
-    todayEstimatedMB: number;
     bgErrors: string[];
   } | null>(null);
   const [error, setError] = React.useState('');
@@ -67,19 +58,18 @@ function App() {
   const reload = React.useCallback(async () => {
     // 纯 storage 直读（不依赖后台消息通道）；读取即滚动，确保跨天后显示当天值
     try {
-      const raw = await chrome.storage.local.get([SETTINGS_KEY, STATS_KEY, 'plugkit:bili:heartbeat']);
+      const raw = await chrome.storage.local.get([
+        SETTINGS_KEY,
+        STATS_KEY,
+        'plugkit:bili:heartbeat',
+      ]);
       const settings = { ...DEFAULT_SETTINGS, ...((raw[SETTINGS_KEY] ?? {}) as Partial<BiliSettings>) };
       const stats = rollStats(
         { ...DEFAULT_STATS, ...((raw[STATS_KEY] ?? {}) as Partial<BiliStats>) } as BiliStats,
       );
       const hb = raw['plugkit:bili:heartbeat'] as { ok?: boolean; err?: string } | undefined;
-      const todayEstimatedMB = Math.round(stats.todayPcdn * settings.avgChunkMB * 10) / 10;
-      const bgErrors = hb
-        ? hb.ok
-          ? []
-          : [`后台初始化失败：${hb.err ?? '未知原因'}`]
-        : ['后台未启动（SW 未运行）']; // 拦截/签到等后台功能需其运行
-      setSnap({ stats, settings, todayEstimatedMB, bgErrors });
+      const bgErrors = hb ? (hb.ok ? [] : [`后台初始化失败：${hb.err ?? '未知原因'}`]) : ['后台未启动'];
+      setSnap({ stats, settings, bgErrors });
       setError('');
     } catch (e) {
       setError(String(e));
@@ -90,7 +80,7 @@ function App() {
     void reload();
   }, [reload]);
 
-  // 实时刷新：settings/stats 变化（content 上报、其他页面修改）自动重新加载
+  // settings/stats 变化（content 上报、其他页面修改）自动刷新
   React.useEffect(() => {
     const onChanged = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
       if (area === 'local' && (changes[SETTINGS_KEY] || changes[STATS_KEY])) {
@@ -112,9 +102,9 @@ function App() {
     return (
       <Popup>
         <div className="plugkit-card">
-          <div className="pk-stat-label">错误</div>
-          <div className="pk-stat-value" style={{ fontSize: 14 }}>{error}</div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+          <div className="pk-stat-label">读取失败</div>
+          <div className="pk-stat-value" style={{ fontSize: 13 }}>{error}</div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
             <Button variant="primary" onClick={() => void reload()}>
               重试
             </Button>
@@ -125,7 +115,6 @@ function App() {
                 await chrome.storage.local.set({
                   [STATS_KEY]: { ...DEFAULT_STATS, today: todayStr(), lastResetAt: Date.now() },
                 });
-                setError('');
                 await reload();
               }}
             >
@@ -136,37 +125,33 @@ function App() {
       </Popup>
     );
   }
+
   if (!snap) {
     return (
       <Popup>
         <div className="plugkit-card">
-          <div className="pk-stat-label">加载中</div>
-          <div className="pk-stat-value" style={{ fontSize: 14 }}>…</div>
+          <div className="pk-stat-label">读取中</div>
         </div>
       </Popup>
     );
   }
 
-  const { stats, settings, todayEstimatedMB, bgErrors } = snap;
+  const { stats, settings, bgErrors } = snap;
   const running = settings.masterOn;
 
   return (
     <Popup>
-      {/* 顶部状态条 */}
       <div className="plugkit-popup-header">
         <img src={chrome.runtime.getURL('icons/48.png')} width={26} height={26} style={{ borderRadius: 6 }} alt="" />
         <h3 style={{ flex: 1, fontSize: 14 }}>B站管理</h3>
         <Badge tone={running ? 'success' : 'muted'}>{running ? '运行中' : '已停用'}</Badge>
       </div>
-      <p style={{ fontSize: 11, color: 'var(--pk-text-muted)', margin: '0 0 10px' }}>
-        今日已为你节省约 <b style={{ color: 'var(--pk-accent)' }}>{todayEstimatedMB}MB</b> 流量
-      </p>
 
       {bgErrors.length > 0 && (
         <div
           title={bgErrors.join('；')}
           style={{
-            marginBottom: 10,
+            marginTop: 8,
             padding: '3px 10px',
             borderRadius: 8,
             background: 'var(--pk-danger-weak)',
@@ -179,30 +164,20 @@ function App() {
           }}
         >
           {bgErrors[0]}
-          {bgErrors.length > 1 ? `（共 ${bgErrors.length} 条）` : ''}
         </div>
       )}
 
-      {/* 段1 · 今日概览 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-        <MiniStat
-          label="PCDN 拦截"
-          value={String(stats.todayPcdn)}
-          sub={`累计 ${stats.totalPcdn}`}
-        />
+      {/* 今日实测数据 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 10 }}>
+        <MiniStat label="拦截请求" value={String(stats.todayPcdn)} sub={`累计 ${stats.totalPcdn}`} />
         <MiniStat
           label="阻止上传"
           value={fmtBytes(stats.todayP2pBytes)}
           sub={`${stats.todayP2pCalls} 次`}
         />
-        <MiniStat
-          label="清理广告"
-          value={String(stats.todayAdRemoved)}
-          sub={`累计 ${stats.totalAdRemoved}`}
-        />
+        <MiniStat label="清理广告" value={String(stats.todayAdRemoved)} sub={`累计 ${stats.totalAdRemoved}`} />
       </div>
 
-      {/* 段2 · 拦截开关（突出总开关） */}
       <div className="plugkit-section-title">拦截</div>
       <div
         className="plugkit-card"
@@ -212,23 +187,29 @@ function App() {
           borderColor: running ? 'var(--pk-accent)' : undefined,
         }}
       >
-        <Toggle label="PCDN / 上传拦截" checked={running} onChange={(v) => void writeSettings({ masterOn: v })} />
+        <Toggle
+          label="PCDN / 上传拦截"
+          checked={running}
+          onChange={(v) => void writeSettings({ masterOn: v })}
+        />
         <div className="pk-stat-sub" style={{ margin: '0 0 6px' }}>
-          {running ? `档位：${settings.aggressive ? '激进' : '标准'}` : '已停用（其余功能不受影响）'}
+          {running ? `档位：${settings.aggressive ? '激进' : '标准'}` : '已停用'}
         </div>
       </div>
 
-      {/* 段3 · 核心功能（胶囊并排） */}
       <div className="plugkit-section-title">功能</div>
       <div className="plugkit-card" style={{ padding: '8px 10px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         <ChipToggle label="广告净化" checked={settings.adClean} onChange={(v) => void writeSettings({ adClean: v })} />
-        <ChipToggle label="播放增强" checked={settings.playerEnhance} onChange={(v) => void writeSettings({ playerEnhance: v })} />
+        <ChipToggle
+          label="播放增强"
+          checked={settings.playerEnhance}
+          onChange={(v) => void writeSettings({ playerEnhance: v })}
+        />
         <ChipToggle label="弹幕管理" checked={settings.danmaku} onChange={(v) => void writeSettings({ danmaku: v })} />
-        <ChipToggle label="账号工具" checked={settings.accountTools} onChange={(v) => void writeSettings({ accountTools: v })} />
         <ChipToggle label="夜间模式" checked={settings.nightMode} onChange={(v) => void writeSettings({ nightMode: v })} />
+        <ChipToggle label="自动签到" checked={settings.autoCheckin} onChange={(v) => void writeSettings({ autoCheckin: v })} />
       </div>
 
-      {/* 段4 · 操作 */}
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
         <Button style={{ flex: 1 }} onClick={() => void browser.tabs.create({ url: 'https://www.bilibili.com/' })}>
           打开 B 站

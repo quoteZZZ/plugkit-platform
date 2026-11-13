@@ -1,4 +1,5 @@
-// feature: 下载 / 导出——在播放页注入「下载封面」「下载视频」「下载字幕」「导出弹幕」
+// feature: 下载 / 导出——在播放页注入「下载封面」「下载视频」「导出弹幕」
+//
 // 关键设计：
 //  1) 视频交给浏览器下载管理器（后台 chrome.downloads）而非 content 内 blob()。
 //     旧实现 fetch 整段视频 → blob → objectURL，几百 MB 的视频会直接把标签页内存打爆；
@@ -58,17 +59,14 @@ async function resolveVideoMeta(): Promise<VideoMeta | null> {
   }
 }
 
-function injectButton(id: string, text: string, onClick: (btn: HTMLButtonElement) => void): void {
-  if (document.querySelector(`#${id}`)) return;
-  const container = document.querySelector(INFO_CONTAINER);
-  if (!container) return;
+function makeButton(id: string, text: string): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.id = id;
   btn.textContent = text;
   btn.style.cssText =
-    'margin-left:8px;padding:2px 10px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;cursor:pointer;font-size:12px;';
-  btn.addEventListener('click', () => onClick(btn));
-  container.appendChild(btn);
+    'margin-left:8px;padding:3px 10px;border:1px solid #d0d7de;border-radius:6px;background:#f6f8fa;' +
+    'cursor:pointer;font-size:12px;line-height:18px;vertical-align:middle;';
+  return btn;
 }
 
 /** 由视频标题生成安全的文件名（去非法字符、截断） */
@@ -131,7 +129,7 @@ async function exportDanmaku(btn: HTMLButtonElement): Promise<void> {
         /* 换下一条 */
       }
     }
-    if (!xml) throw new Error('弹幕接口均不可用（该视频可能无弹幕或接口已变更）');
+    if (!xml) throw new Error('弹幕接口均不可用（该视频可能无弹幕）');
     saveBlob(new Blob([xml], { type: 'application/xml' }), `danmaku_${meta.cid}.xml`);
     toast('弹幕已导出', 'success');
   } catch (e) {
@@ -199,71 +197,25 @@ async function downloadVideo(btn: HTMLButtonElement): Promise<void> {
   }
 }
 
-/** 下载字幕（player/v2 接口取字幕列表 → 转 Srt） */
-async function downloadSubtitle(btn: HTMLButtonElement): Promise<void> {
-  const meta = await resolveVideoMeta();
-  if (!meta) {
-    toast('未获取到视频信息', 'error');
-    return;
-  }
-  btn.textContent = '查找字幕…';
-  btn.disabled = true;
-  try {
-    const api = `https://api.bilibili.com/x/player/v2?bvid=${meta.bvid}&cid=${meta.cid}`;
-    const res = await fetch(api, { credentials: 'include' });
-    const json = (await res.json()) as {
-      code: number;
-      message?: string;
-      data?: { subtitle?: { subtitles?: { lan_doc?: string; subtitle_url?: string }[] } };
-    };
-    const subs = json.data?.subtitle?.subtitles ?? [];
-    const picked = subs.find((s) => s.subtitle_url) ?? subs[0];
-    if (json.code !== 0 || !picked?.subtitle_url) {
-      throw new Error('该视频没有可用字幕（需视频自带或登录后 AI 字幕）');
-    }
-    const subUrl = picked.subtitle_url.startsWith('//')
-      ? `https:${picked.subtitle_url}`
-      : picked.subtitle_url;
-
-    btn.textContent = '下载字幕…';
-    const sres = await fetch(subUrl, { credentials: 'include' });
-    if (!sres.ok) throw new Error(`字幕 HTTP ${sres.status}`);
-    const j = (await sres.json()) as {
-      body?: { from: number; to: number; content: string }[];
-    };
-    const body = j.body ?? [];
-    if (body.length === 0) throw new Error('字幕内容为空');
-
-    // 转 Srt
-    const fmt = (s: number) => {
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      const sec = Math.floor(s % 60);
-      const ms = Math.round((s % 1) * 1000);
-      const pad = (n: number, l = 2) => String(n).padStart(l, '0');
-      return `${pad(h)}:${pad(m)}:${pad(sec)},${pad(ms, 3)}`;
-    };
-    const srt = body
-      .map((c, i) => `${i + 1}\n${fmt(c.from)} --> ${fmt(c.to)}\n${c.content.replace(/\n/g, ' ')}\n`)
-      .join('\n');
-    saveBlob(new Blob([srt], { type: 'text/srt' }), `${safeFileName(meta.title)}.srt`);
-    toast('字幕已下载（Srt）', 'success');
-  } catch (e) {
-    toast(`字幕下载失败：${(e as Error).message}`, 'error');
-  } finally {
-    btn.textContent = '下载字幕';
-    btn.disabled = false;
-  }
-}
-
 export function startDownloadTools(s: BiliSettings): void {
-  if (!(s.coverDownload || s.videoDownload || s.subtitleDownload || s.danmakuExport)) return;
+  if (!(s.coverDownload || s.videoDownload || s.danmakuExport)) return;
   void waitFor(INFO_CONTAINER, 6000).then((container) => {
     if (!container) return;
-    // 一次就绪后统一注入，避免旧实现 4 路各自轮询 6 秒
-    if (s.coverDownload) injectButton('plugkit-cover-dl', '下载封面', () => void downloadCover());
-    if (s.videoDownload) injectButton('plugkit-video-dl', '下载视频', (b) => void downloadVideo(b));
-    if (s.subtitleDownload) injectButton('plugkit-subtitle-dl', '下载字幕', (b) => void downloadSubtitle(b));
-    if (s.danmakuExport) injectButton('plugkit-dm-export', '导出弹幕', (b) => void exportDanmaku(b));
+    // 一次就绪后统一注入，避免 4 路各自轮询 6 秒
+    if (s.coverDownload) {
+      const btn = makeButton('plugkit-cover-dl', '下载封面');
+      btn.addEventListener('click', () => void downloadCover());
+      container.appendChild(btn);
+    }
+    if (s.videoDownload) {
+      const btn = makeButton('plugkit-video-dl', '下载视频');
+      btn.addEventListener('click', () => void downloadVideo(btn));
+      container.appendChild(btn);
+    }
+    if (s.danmakuExport) {
+      const btn = makeButton('plugkit-dm-export', '导出弹幕');
+      btn.addEventListener('click', () => void exportDanmaku(btn));
+      container.appendChild(btn);
+    }
   });
 }

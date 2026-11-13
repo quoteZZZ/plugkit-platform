@@ -49,5 +49,39 @@
         "ping"
       ]
     }
+  },
+  {
+    "id": 50,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||data.bilibili.com",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "media",
+        "websocket",
+        "other",
+        "ping"
+      ]
+    }
+  },
+  {
+    "id": 51,
+    "priority": 1,
+    "action": {
+      "type": "block"
+    },
+    "condition": {
+      "urlFilter": "||data.bilivideo.com",
+      "resourceTypes": [
+        "xmlhttprequest",
+        "media",
+        "websocket",
+        "other",
+        "ping"
+      ]
+    }
   }
 ]

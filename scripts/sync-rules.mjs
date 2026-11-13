@@ -19,8 +19,14 @@ const wxtConfigPath = join(appDir, 'wxt.config.ts');
 const RESOURCE_TYPES = ['xmlhttprequest', 'media', 'websocket', 'other', 'ping'];
 
 const patterns = JSON.parse(await readFile(patternsPath, 'utf8'));
-if (!Array.isArray(patterns.base) || !Array.isArray(patterns.aggressive)) {
-  console.error('pcdn-patterns.json 结构非法：需要 { base: string[], aggressive: string[] }');
+if (
+  !Array.isArray(patterns.base) ||
+  !Array.isArray(patterns.aggressive) ||
+  (patterns.telemetry != null && !Array.isArray(patterns.telemetry))
+) {
+  console.error(
+    'pcdn-patterns.json 结构非法：需要 { base: string[], aggressive: string[], telemetry?: string[] }',
+  );
   process.exit(1);
 }
 
@@ -34,7 +40,12 @@ function buildRules(domains, startId) {
   }));
 }
 
-const baseRules = buildRules(patterns.base, 1);
+// 遥测/上报域名并入基础档：它们同样在消耗上行与请求，且拦截后不影响播放。
+// id 段 50 起，与 base(1..) / aggressive(101..) 隔开，便于日后增删。
+const baseRules = [
+  ...buildRules(patterns.base, 1),
+  ...buildRules(patterns.telemetry ?? [], 50),
+];
 const aggressiveRules = buildRules(patterns.aggressive, 101);
 
 await writeFile(rulesBasePath, JSON.stringify(baseRules, null, 2) + '\n');
@@ -44,7 +55,7 @@ console.log(`✅ 已生成 ${rulesAggressivePath}（${aggressiveRules.length} �
 
 // —— 一致性校验（host_permissions 必须覆盖全部拦截域名；只读告警，不自动改）——
 // 覆盖判断：条目 `*://*.X/*` 对 d 生效，当 d === X 或以 `.X` 结尾（子域通配）。
-const allDomains = [...patterns.base, ...patterns.aggressive];
+const allDomains = [...patterns.base, ...patterns.aggressive, ...(patterns.telemetry ?? [])];
 const cfg = await readFile(wxtConfigPath, 'utf8');
 const perms = [...cfg.matchAll(/\*:\/\/\*\.([a-zA-Z0-9.-]+)\/\*/g)].map((m) => m[1]);
 const missing = allDomains.filter(
